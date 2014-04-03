@@ -11,21 +11,22 @@
 ;;;;;;;;;;;;;
 ;;; Impl
 
-(def active-cluster (atom nil))
 (def default-keyspace (atom nil))
 
 (def ccm-dir (io/file (.getProperty (System/getProperties) "user.home") ".ccm"))
 
-(defn- ccm [& cmd]
+(defn- ccm
+  [& cmd]
   (let [quiet (some #{:quiet} cmd)
         cmd* (vec (filter #(not= :quiet %) cmd))
         r (apply shell/sh "ccm" cmd*)]
+    (log/debug "cmd: " cmd*)
     (if (and (not quiet) (not= (:out r) "") (not (.contains (:out r) "JavaLaunchHelper"))) ;java logging bug
       (log/info (str "CCM=> " (str/trim (:out r)))))
     (if (not= (:err r) "")
       (log/error (str "CCM=> " (str/trim (:err r)))))
     (if (not= (:exit r) 0)
-      (throw (RuntimeException. (str "CCM failure: " (str/trim (:err r)) "cmd:" cmd* ))))
+      (throw (RuntimeException. (str "CCM failure: " (str/trim (:err r)) " cmd:" cmd*))))
     r))
 
 (defn- conf-as-map [conf-file]
@@ -33,26 +34,60 @@
   ;BUT we'll keyword cos we can't help ourselves."
   (apply array-map (mapcat
                      (fn [line]
-                       (let [[k v] (map str/trim (re-seq #"[^:]+" line))]
-                         (letfn [(realize [i] (condp = (.charAt i 0) ;todo pretty hacky
-                                                \[ (vec (map realize (re-seq #"[^\[\],]+" i)))
-                                                \{ (vec (map realize (re-seq #"[^\{\},]+" i)))
-                                                (str/trim i)))]
-                           [(keyword k) (realize v)])))
+                       (let [k (subs line 0 (inc (.indexOf line ":")))
+                             v (subs line (inc (.indexOf line ":")))]
+                         (letfn [(realize [i]
+                                          (as-> (str/trim i) i
+                                                (cond
+                                                  (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
+                                                  (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))
+                                                  (.endsWith i ":") (keyword (subs i 0 (dec (.length i))))
+                                                  (= i "null") nil
+                                                  :else i)))]
+                           [(realize k) (realize v)])))
                      (re-seq #"[^\n]+" (slurp conf-file)))))
 
+(defprotocol CCMCoercions
+  "Coerce to cqlsh args."
+  (as-cqlsh-arg [x] "Coerce argument to a file.")
+  (to-str [_] "For logging convienence"))
+
+(extend-protocol CCMCoercions
+  nil
+  (as-cqlsh-arg [_] (throw (IllegalArgumentException. "Nil arg to cqlsh")))
+  (to-str [_] "")
+  ;String    ;ccm bug doenst like trailing ';' ?
+  ;(as-cqlsh-arg [x] [(str "-x "  "\"" (if (.endsWith x ";") (subs x 0 (dec (.length x)))  x) "\"" " -v")])
+  ;(to-str [x] (subs x 0 (min (.length x) 100)))
+
+  File
+  (as-cqlsh-arg [x] ["--file" (.getAbsolutePath x)])
+  (to-str [x] (.getAbsolutePath x))
+
+  URL
+  (as-cqlsh-arg [x] ["--file" (let [content (slurp x)
+                                    tmpFile (File/createTempFile (str x) nil)]
+                                (spit tmpFile content)
+                                (.getAbsolutePath tmpFile))])
+  (to-str [x] (.toString x))
+
+  ;Reader     ;ccm bug ?
+  ;(as-cqlsh-arg [x] [(str "-x "  "\"" (let [c (slurp x)] (if (.endsWith c ";") (subs c 0 (dec (.length c))) c)) "\"" " -v")])
+  ;(to-str [x] x)
+  )
+
 (defn- coerce-as-cqlsh-arg [thing]
-  ;todo use pipe redirects
+  ;todo use pipe redirects ?
   (condp = (type thing)
     File ["--file" (.getAbsolutePath thing)]
     URL ["--file" (let [content (slurp thing)
                         tmpFile (File/createTempFile (str thing) nil)]
                     (spit tmpFile content)
                     (.getAbsolutePath tmpFile))]
-    ; todo doesnt do compound  Reader ["-x " (str "\"" (slurp thing) "\"")]
-    ; todo doesnt do compound String ["-x " (str "\"" thing "\"")]
+    Reader ["-x " (str "\"" (slurp thing) "\"") "-v"]
+    String ["-x " (str "\"" thing "\"") "-v"]
     nil (throw (IllegalArgumentException. "Nil arg to cqlsh"))
-    (throw (IllegalArgumentException. (str "Unknown type " (type thing) "for cqlsh arg " thing)))))
+    (throw (IllegalArgumentException. (str "Unknown type " (type thing) " for cql! arg " thing)))))
 
 (declare stop!)
 
@@ -67,7 +102,9 @@
 (defn get-active-cluster
   "Get name of active cluster"
   []
-  @active-cluster)
+  (if (.exists (io/file ccm-dir "CURRENT"))
+    (str/trim (slurp (io/file ccm-dir "CURRENT")))
+    nil))
 
 (defn set-default-keyspace!
   "Set default keyspace"
@@ -82,14 +119,15 @@
 (defn get-cluster-conf
   "Get a map of the cluster conf"
   ([]
-   (get-cluster-conf @active-cluster))
+   (if (get-active-cluster) (get-cluster-conf (get-active-cluster)) nil))
   ([name]
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
 (defn get-node-conf
-  "Get a map of the cluster conf"
+  "Get a map of the node conf `name`"
   ([name]
-   (get-node-conf @active-cluster name))
+   {:pre (= (get-active-cluster) nil)}
+   (get-node-conf (get-active-cluster) name))
   ([cluster name]
    (conf-as-map (io/file ccm-dir cluster name (str name ".conf")))))
 
@@ -100,25 +138,24 @@
     (log/info (str name " cluster started"))
     result))
 
-(defn cqlsh!
+(defn cql!
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster."
   ([cmd-source]
-   (cqlsh! cmd-source @default-keyspace "" "node1"))
+   (cql! cmd-source @default-keyspace "" "node1"))
   ([cmd-source keyspace]
-   (cqlsh! cmd-source keyspace "" "node1"))
+   (cql! cmd-source keyspace "" "node1"))
   ([cmd-source keyspace log-name]
-   (cqlsh! cmd-source keyspace log-name "node1"))
+   (cql! cmd-source keyspace log-name "node1"))
   ([cmd-source keyspace log-name node-name]
    (let [thing cmd-source
-         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) (coerce-as-cqlsh-arg thing)))]
-     (log/info (str log-name " load finished (check for errors in output) : ") (subs (str thing) 0 (min (count (str thing)) 100)))
+         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) (as-cqlsh-arg thing)))]
+     (log/info (str log-name " load finished of " (to-str cmd-source) " (check for errors in output)"))
      result)))
 
 (defn switch!
   "Switch active cluster to `name`"
   [name]
   (let [result (ccm "switch" name)]
-    (reset! active-cluster name)
     (log/info (str "Switch active cluster to " name))
     result))
 
@@ -131,20 +168,17 @@
   "Stop the current CCM cluster."
   []
   (let [result (ccm "stop")]
-    (reset! active-cluster nil)
-    (log/info (str @active-cluster " cluster stopped"))
+    (log/info (str (get-active-cluster) " cluster stopped"))
     result))
 
 (defn remove!
   "Remove cluster `name` from CCM including all data."
   [name]
   (let [result (ccm "remove" name)]
-    (if (= name @active-cluster)
-      (reset! active-cluster nil))
     (log/info (str name " cluster removed"))
     result))
 
-(defn has-cluster?
+(defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
   ;Correct by CCM but do we go further?
@@ -157,7 +191,7 @@
   [name version num-nodes cql-port]
   (let [cluster-dir (io/file ccm-dir name)
         cluster-exists (.exists cluster-dir)]
-    (if (not (has-cluster? `name))
+    (if (not (cluster? `name))
       (do
         (log/info "Creating new cluster" name)
         (ccm "create" name "-v" version)
