@@ -37,7 +37,7 @@
                        (let [k (subs line 0 (inc (.indexOf line ":")))
                              v (subs line (inc (.indexOf line ":")))]
                          (letfn [(realize [i]
-                                          (as-> (str/trim i) i
+                                          (let [i (str/trim i)]
                                                 (cond
                                                   (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
                                                   (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))

@@ -10,15 +10,17 @@
   (ccm-clj/remove! "ccmcljtest1")
   (if current (switch! current)))
 
-;todo check :err expect-no-err ?
-(expect (new! "ccmcljtest1" "2.0.4" 3 19111))
+(defmacro expect-no-stderr [body]
+  `(expect "" (:err (~@body))))
+
+(expect-no-stderr (new! "ccmcljtest1" "2.0.4" 3 19111))
 
 ;cql as file
-(expect (cql! (io/file "./test/resources/test-keyspace.cql")))
+(expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
 ;cql as url, keyspace in file
-(expect (cql! (io/resource "test-schema.cql")))
+(expect-no-stderr (cql! (io/resource "test-schema.cql")))
 ;file with given keyspace
-(expect (cql! (io/file "./test/resources/test-data.cql") "ccmclj"))
+(expect-no-stderr (cql! (io/file "./test/resources/test-data.cql") "ccmclj"))
 
 (expect (set-default-keyspace! "ccmclj"))
 ;load string using default keyspace - and trim surplus ; which ccm spews on   ;todo still doesnt work?
