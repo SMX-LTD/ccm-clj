@@ -6,7 +6,24 @@ It is not a recommended for use as a CQL client (see https://github.com/mpenet/a
 
 ## Current Version
 
-https://clojars.org/com.smxemail/ccm-clj/latest-version.svg
+Artifacts are released to Clojars. If you are using Maven, add the following repository definition to your pom.xml:
+
+<repository>
+  <id>clojars.org</id>
+  <url>http://clojars.org/repo</url>
+</repository>
+
+With Leiningen:
+
+[clojurewerkz/money "1.5.0"]
+
+With Maven:
+
+<dependency>
+  <groupId>clojurewerkz</groupId>
+  <artifactId>money</artifactId>
+  <version>1.5.0</version>
+</dependency>
 
 ## Usage
 
@@ -22,8 +39,9 @@ https://clojars.org/com.smxemail/ccm-clj/latest-version.svg
     (ccm/start! "testcluster")))
 ```
 
-For more see ;;Public in [`src/ccm-clj.clj`](ccm-clj.clj) or tests in [`test/ccm-clj-test.clj`](ccm-clj-test.clj).
+For more see ;;Public in [`src/ccm-clj.clj`](src/ccm-clj.clj) or tests in [`test/ccm-clj-test.clj`](test/ccm-clj-test.clj).
 Note: tests run via:
+
 ```clojure
 lein all expectations
 ```
