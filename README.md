@@ -16,7 +16,7 @@ Artifacts are released to Clojars. If you are using Maven, add the following rep
 With Leiningen:
 
 ```clojure
-[clojurewerkz/money "0.1.1"]
+[com.smxemail/ccm-clj "0.1.1"]
 ```
 
 With Maven:
