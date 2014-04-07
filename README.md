@@ -15,15 +15,19 @@ Artifacts are released to Clojars. If you are using Maven, add the following rep
 
 With Leiningen:
 
-[clojurewerkz/money "1.5.0"]
+```clojure
+[clojurewerkz/money "0.1.1"]
+```
 
 With Maven:
 
+```xml
 <dependency>
-  <groupId>clojurewerkz</groupId>
-  <artifactId>money</artifactId>
-  <version>1.5.0</version>
+  <groupId>com.smxemail</groupId>
+  <artifactId>ccm-clj</artifactId>
+  <version>0.1.1</version>
 </dependency>
+```
 
 ## Usage
 
@@ -39,7 +43,8 @@ With Maven:
     (ccm/start! "testcluster")))
 ```
 
-For more see ;;Public in [`src/ccm-clj.clj`](src/ccm-clj.clj) or tests in [`test/ccm-clj-test.clj`](test/ccm-clj-test.clj).
+For more see ;;Public in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm-clj_test.clj).
+
 Note: tests run via:
 
 ```clojure
@@ -55,3 +60,4 @@ Email Colin Taylor courtesy gmail.
 Copyright © 2014 SMX Ltd (http://smxemail.com) and Contributors.
 
 Distributed under the Eclipse Public License.
+
