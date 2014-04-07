@@ -8,10 +8,12 @@ It is not a recommended for use as a CQL client (see https://github.com/mpenet/a
 
 Artifacts are released to Clojars. If you are using Maven, add the following repository definition to your pom.xml:
 
+```xml
 <repository>
   <id>clojars.org</id>
   <url>http://clojars.org/repo</url>
 </repository>
+```
 
 With Leiningen:
 
