@@ -7,7 +7,6 @@
            (java.io File Reader)
            (java.net URL)))
 
-
 ;;;;;;;;;;;;;
 ;;; Impl
 
@@ -75,19 +74,6 @@
   ;(as-cqlsh-arg [x] [(str "-x "  "\"" (let [c (slurp x)] (if (.endsWith c ";") (subs c 0 (dec (.length c))) c)) "\"" " -v")])
   ;(to-str [x] x)
   )
-
-(defn- coerce-as-cqlsh-arg [thing]
-  ;todo use pipe redirects ?
-  (condp = (type thing)
-    File ["--file" (.getAbsolutePath thing)]
-    URL ["--file" (let [content (slurp thing)
-                        tmpFile (File/createTempFile (str thing) nil)]
-                    (spit tmpFile content)
-                    (.getAbsolutePath tmpFile))]
-    Reader ["-x " (str "\"" (slurp thing) "\"") "-v"]
-    String ["-x " (str "\"" thing "\"") "-v"]
-    nil (throw (IllegalArgumentException. "Nil arg to cqlsh"))
-    (throw (IllegalArgumentException. (str "Unknown type " (type thing) " for cql! arg " thing)))))
 
 (declare stop!)
 

@@ -43,11 +43,15 @@ With Maven:
   (do
     (ccm/switch! "testcluster")
     (ccm/start! "testcluster")))
+....
+(ccm/remove! "testcluster")
 ```
 
-For more see ;;Public in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm-clj_test.clj).
+Note: ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx respectively. Currently the remote debug port is not exposed.
 
-Note: tests run via:
+For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
+
+## Tests Usage
 
 ```clojure
 lein all expectations
