@@ -1,6 +1,7 @@
 # ccm-clj
 
 A Clojure interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
+
 It is not a recommended for use as a CQL client (see https://github.com/mpenet/alia).
 
 
@@ -37,9 +38,9 @@ With Maven:
 (if (not (ccm/cluster? "testcluster"))
   (do
     (ccm/new! "testcluster" cass-version num-nodes cql-port)
-    (ccm/cql! (io/file "./test/resources/test-keyspace.cql") nil "Keyspace")
-    (ccm/cql! (io/resource "schema/test-schema.cql") "testkeyspace" "Schema")
-    (ccm/cql! (io/file "./test/resources/test-data.cql") "testkeyspace" "Data"))
+    (ccm/cql! (io/file "./test/resources/test-keyspace.cql"))
+    (ccm/cql! (io/resource "schema/test-schema.cql") "testkeyspace")
+    (ccm/cql! (io/file "./test/resources/test-data.cql") "testkeyspace"))
   (do
     (ccm/switch! "testcluster")
     (ccm/start! "testcluster")))
@@ -47,9 +48,9 @@ With Maven:
 (ccm/remove! "testcluster")
 ```
 
-Note: ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx respectively. Currently the remote debug port is not exposed.
+Note: ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively. Currently the remote debug port is not exposed.
 
-For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
+For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj#L81) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
 
 ## Tests Usage
 
