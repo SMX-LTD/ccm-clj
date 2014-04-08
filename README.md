@@ -29,6 +29,43 @@ With Maven:
 </dependency>
 ```
 
+### CCM installation
+
+See Requirements and Installation at https://github.com/pcmanus/ccm
+
+Note that local loopback aliasing may be required on OSX.
+I have /Library/LaunchDaemons/moreloopbacks.plist:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST
+1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+<key>Label</key>
+<string>MORE_LOOPBACKS</string>
+<key>ProgramArguments</key>
+<array>
+<string>/usr/local/scripts/moreloopbacks.sh</string>
+</array>
+<key>RunAtLoad</key>
+<true/>
+<key>UserName</key>
+<string>ROOT</string>
+<key>GroupName</key>
+<string>WHEEL</string>
+</dict>
+```
+
+And then /usr/local/scripts/moreloopbacks.sh:
+```bash
+#!/bin/bash
+for ((i=2;i<6;i++))
+do
+  sudo ifconfig lo0 alias 127.0.0.$i up
+done
+```
+
 ## Usage
 
 ```clojure
@@ -47,6 +84,7 @@ With Maven:
 
 Notes:
 
+- Ips from 127.0.0.1 to 127.0.0.n will be used this may require loopback aliasing see Installation.
 - Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
 - If you abort without cleanup, you may leave CassandraDaemon's running which you can stop from the repl  `(ccm/stop!)` or in the shell `ccm stop`.
 
