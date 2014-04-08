@@ -29,11 +29,13 @@
     r))
 
 (defn- conf-as-map [conf-file]
+  ;todo this pretty suss
   ;Python config parsers do not guess datatypes of values in configuration files, always storing them internally as string,
   ;BUT we'll keyword cos we can't help ourselves."
   (apply array-map (mapcat
                      (fn [line]
-                       (let [[k v] (str/split line #":" 2)]
+                       (let [k (subs line 0 (inc (.indexOf line ":")))
+                             v (subs line (inc (.indexOf line ":")))]      ;todo comments multi-lines
                          (letfn [(realize [i]
                                           (let [i (str/trim i)]
                                                 (cond
