@@ -48,7 +48,7 @@ With Maven:
 Notes:
 
 - Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
-- If you abort without cleanup, you may leave CassandraDaemon's running which you can stop/remove from repl  `(ccm/stop!)` or from shell `ccm stop`.
+- If you abort without cleanup, you may leave CassandraDaemon's running which you can stop from the repl  `(ccm/stop!)` or in the shell `ccm stop`.
 
 For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj#L81) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
 
