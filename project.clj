@@ -1,4 +1,4 @@
-(defproject com.smxemail/ccm-clj "0.1.1"
+(defproject com.smxemail/ccm-clj "0.1.2-SNAPSHOT"
   :description "Clojure interface to Cassandra Cluster Manager"
   :min-lein-version "2.0.0"
   :url "https://github.com/SMX-LTD/ccm-clj"
@@ -21,4 +21,4 @@
              :dev    {:source-paths   ["dev"]
                       :resource-paths ["test/resources"]
                       :dependencies   [[expectations "2.0.7"]]}}
-  :aliases {"all" ["with-profile" "+dev:+1.4:+1.5:+master"]})
+  :aliases {"all" ["with-profile" "+dev:+1.4:+1.5:+1.6:+master"]})

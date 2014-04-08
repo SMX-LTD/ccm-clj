@@ -29,12 +29,11 @@
     r))
 
 (defn- conf-as-map [conf-file]
-  ;Config parsers do not guess datatypes of values in configuration files, always storing them internally as string,
+  ;Python config parsers do not guess datatypes of values in configuration files, always storing them internally as string,
   ;BUT we'll keyword cos we can't help ourselves."
   (apply array-map (mapcat
                      (fn [line]
-                       (let [k (subs line 0 (inc (.indexOf line ":")))
-                             v (subs line (inc (.indexOf line ":")))]
+                       (let [[k v] (str/split line #":" 2)]
                          (letfn [(realize [i]
                                           (let [i (str/trim i)]
                                                 (cond
@@ -179,7 +178,7 @@
         cluster-exists (.exists cluster-dir)]
     (if (not (cluster? `name))
       (do
-        (log/info "Creating new cluster" name)
+        (log/info "Creating new cluster (may require source downloading and building)" name)
         (ccm "create" name "-v" version)
         (doseq [i (range 1 (inc num-nodes))
                 :let [ip (str "127.0.0." i)

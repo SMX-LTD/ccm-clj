@@ -1,9 +1,6 @@
 # ccm-clj
 
-A Clojure interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
-
-It is not a recommended for use as a CQL client (see https://github.com/mpenet/alia).
-
+A Clojure (1.4+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
 
 ## Current Version
 
@@ -48,7 +45,10 @@ With Maven:
 (ccm/remove! "testcluster")
 ```
 
-Note: ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively. Currently the remote debug port is not exposed.
+Notes:
+
+- Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
+- If you abort without cleanup, you may leave CassandraDaemon's running which you can stop/remove from repl  `(ccm/stop!)` or from shell `ccm stop`.
 
 For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj#L81) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
 
@@ -60,7 +60,7 @@ lein all expectations
 
 ## Contact
 
-Email Colin Taylor courtesy gmail.
+Colin Taylor at gmail.
 
 ## License
 
