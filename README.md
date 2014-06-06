@@ -84,6 +84,7 @@ done
 
 Notes:
 
+- Probably doesn't work on Windows. Patches welcome.
 - IPs from 127.0.0.1 to 127.0.0.n will be used, this may require loopback aliasing see Installation.
 - Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
 - If you abort without cleanup, you may leave CassandraDaemon's running which you can stop from the repl  `(ccm/stop!)` or in the shell `ccm stop`.
