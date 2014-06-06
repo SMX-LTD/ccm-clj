@@ -134,12 +134,4 @@
     (start! name)
     (switch! name)))
 
-;(defn launch!
-;  "Launch the default terminal with cqlsh running against the specified node or 'node1'"
-;  ([]
-;   (launch! "node1"))
-;  ([node]
-;   (shell/sh "open" "--args" "zsh" "-c" "ccm" node "cqlsh")))
-
-
 
