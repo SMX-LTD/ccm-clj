@@ -43,12 +43,10 @@
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
 (defn get-node-conf
-  "Get a map of the node conf `name`"
+  "Get a map of the conf for the node `name` from active cluster"
   ([name]
    {:pre (= (get-active-cluster) nil)}
-   (get-node-conf (get-active-cluster) name))
-  ([cluster name]
-   (conf-as-map (io/file ccm-dir cluster name (str name ".conf")))))
+   (conf-as-map (io/file ccm-dir (get-active-cluster) name (str name ".conf")))))
 
 (defn start!
   "Start CCM cluster `name`."
@@ -58,7 +56,8 @@
     result))
 
 (defn cql!
-  "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster."
+  "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
+  Note this is a convienent way of loading schemas, and shouldn't be used in place of a proper CQL client like Alia or Cassaforte."
   ([cmd-source]
    (cql! cmd-source @default-keyspace "" "node1"))
   ([cmd-source keyspace]
@@ -100,7 +99,6 @@
 (defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
-  ;Correct by CCM but do we go further?
   (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet))))
 
 (defn new!
