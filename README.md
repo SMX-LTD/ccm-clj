@@ -69,6 +69,11 @@ done
 ## Usage
 
 ```clojure
+
+(ns some-cas-test
+  (:require [ccm-clj :as ccm]
+            [clojure.java.io :as io]))
+
 (if (not (ccm/cluster? "testcluster"))
   (do
     (ccm/new! "testcluster" cass-version num-nodes cql-port)
