@@ -89,6 +89,7 @@ done
 
 Notes:
 
+- This is NOT A CQL CLIENT it's for test cluster setup. Instead, use [`Alia`](https://github.com/mpenet/alia) or [`Cassaforte`](https://github.com/clojurewerkz/cassaforte).
 - Probably doesn't work on Windows. Patches welcome.
 - IPs from 127.0.0.1 to 127.0.0.n will be used, this may require loopback aliasing see Installation.
 - Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
