@@ -1,6 +1,2 @@
 language: clojure
 lein: lein2
-
-# configure notifications (email, IRC, campfire etc)
-notifications:
-  irc: "irc.freenode.org#travis"
