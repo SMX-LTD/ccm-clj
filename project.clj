@@ -1,4 +1,4 @@
-(defproject com.smxemail/ccm-clj "0.2.0"
+(defproject com.smxemail/ccm-clj "0.1.3"
   :description "Clojure interface to Cassandra Cluster Manager"
   :min-lein-version "2.0.0"
   :url "https://github.com/SMX-LTD/ccm-clj"
