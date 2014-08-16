@@ -1,4 +1,4 @@
-(defproject com.smxemail/ccm-clj "0.1.3-SNAPSHOT"
+(defproject com.smxemail/ccm-clj "0.2.0"
   :description "Clojure interface to Cassandra Cluster Manager"
   :min-lein-version "2.0.0"
   :url "https://github.com/SMX-LTD/ccm-clj"
@@ -20,5 +20,7 @@
              :master {:dependencies [[org.clojure/clojure "1.7.0-master-SNAPSHOT"]]}
              :dev    {:source-paths   ["dev"]
                       :resource-paths ["test/resources"]
-                      :dependencies   [[expectations "2.0.7"]]}}
+                      :dependencies   [[expectations "2.0.7"]
+                                       [ch.qos.logback/logback-classic "1.0.13"]
+                                       [ch.qos.logback/logback-core "1.0.13"]]}}
   :aliases {"all" ["with-profile" "+dev:+1.4:+1.5:+1.6:+master"]})

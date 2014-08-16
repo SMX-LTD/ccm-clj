@@ -2,29 +2,32 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.java.shell2 :as shell]
-            [clojure.tools.logging :as log]
-            [ccm-clj.impl :refer :all])
-  (:import (java.util.concurrent ScheduledThreadPoolExecutor TimeUnit)
-           (java.io File Reader)
-           (java.net URL)))
+            [clojure.tools.logging :as log])
+  (:import [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]
+           [java.io File Reader]
+           [java.net URL ServerSocket]
+           [java.util Properties]))
 
 ;;;;;;;;;;;;;
 ;;; Impl
 
-(def ccm-dir (io/file (.getProperty (System/getProperties) "user.home") ".ccm"))
+(def ccm-dir (io/file (.getProperty ^Properties (System/getProperties) "user.home") ".ccm"))
 
 (defn ccm
   [& cmd]
   (let [quiet (some #{:quiet} cmd)
         cmd* (vec (filter #(not= :quiet %) cmd))
-        r (apply shell/sh "ccm" cmd*)]
-    (log/debug "cmd: " cmd*)
-    (if (and (not quiet) (not= (:out r) "") (not (.contains (:out r) "JavaLaunchHelper"))) ;java logging bug
-      (log/info (str "CCM=> " (str/trim (:out r)))))
-    (if (not= (:err r) "")
-      (log/error (str "CCM=> " (str/trim (:err r)))))
-    (if (not= (:exit r) 0)
-      (throw (RuntimeException. (str "CCM failure: " (str/trim (:err r)) " cmd:" cmd*))))
+        r (apply shell/sh "ccm" cmd*)
+        exit (:exit r)
+        out (str/trim (.replace (:out r) "\\\\" "\\"))
+        err (str/trim (.replace (:err r) "\\\\" "\\"))]
+    (if-not quiet (log/info "cmd:" cmd*))
+    (if (and (not quiet) (not= out "") (not (.contains (:out r) "JavaLaunchHelper"))) ;java logging bug
+      (log/info (str "CCM => " (str/trim out))))
+    (if (not= err "")
+      (log/error (str "CCM => " (str/trim err))))
+    (if (not= exit 0)
+      (throw (RuntimeException. (str "CCM failure [" exit "]:" (str/trim (:err r)) " cmd:" cmd*))))
     r))
 
 (defn conf-as-map [conf-file]
@@ -75,4 +78,5 @@
   ;(as-cqlsh-arg [x] [(str "-x "  "\"" (let [c (slurp x)] (if (.endsWith c ";") (subs c 0 (dec (.length c))) c)) "\"" " -v")])
   ;(to-str [x] x)
   )
+
 

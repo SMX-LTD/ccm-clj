@@ -4,16 +4,19 @@
             [ccm-clj :refer :all]))
 
 (def existing (get-clusters))
-(def current (get-active-cluster))
+(def current-cluster (get-active-cluster))
+(def current-keyspace (get-default-keyspace))
 
 (defn tidy-up {:expectations-options :after-run} []
-  (ccm-clj/remove! "ccmcljtest1")
-  (if current (switch! current)))
+  (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
+  (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
+  (set-default-keyspace! current-keyspace)
+  (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
 
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
 
-(expect-no-stderr (new! "ccmcljtest1" "2.0.4" 3 19111))
+(expect-no-stderr (new! "ccmcljtest1" "2.0.4" 3 20111))
 
 ;cql as file
 (expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
@@ -33,10 +36,11 @@
 (expect (conj (set existing) "ccmcljtest1") (set (get-clusters)))
 (expect (cluster? "ccmcljtest1"))
 (expect "ccmclj" (get-default-keyspace))
-(expect (not (cluster? "ccmcljtest2")))
 
-(expect (new! "ccmcljtest2" "1.2.0" 1 19212))
+(expect (not (cluster? "ccmcljtest2")))
+(expect (new! "ccmcljtest2" "2.0.4" 2 20211))
 (expect "ccmcljtest2" (get-active-cluster))
+(expect (set ["node1" "node2"]) (set (:nodes (get-cluster-conf))))
 (expect (remove! "ccmcljtest2"))
 (expect nil (get-active-cluster))
 
@@ -46,9 +50,11 @@
 (expect (switch! "ccmcljtest1"))
 (expect "ccmcljtest1" (get-active-cluster))
 
-(expect (exec! "add" "-r 0" "-t 127.0.0.4:19112" "-j 19114" "-l 127.0.0.4:19114" "--binary-itf=127.0.0.4:19111" "node4"))
-(expect (hash-set "node1" "node2" "node3" "node4") (set (:nodes (get-cluster-conf))))
 
-(expect (exec! "node4" "remove"))
+(expect (hash-set "node1" "node2" "node3" "node4")
+        (do (add-node! "node4" "127.0.0.4" 20111)
+            (set (:nodes (get-cluster-conf)))))
+
+(expect (remove-node! "node4"))
 (expect (hash-set "node1" "node2" "node3") (set (:nodes (get-cluster-conf))))
 
