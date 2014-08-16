@@ -1,4 +1,4 @@
-# ccm-clj
+# CCM-clj
 
 A Clojure (1.4+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
 
@@ -87,15 +87,18 @@ done
 (ccm/remove! "testcluster")
 ```
 
-Notes:
+## Notes
 
 - This is NOT A CQL CLIENT it's for test cluster setup. Instead, use [`Alia`](https://github.com/mpenet/alia) or [`Cassaforte`](https://github.com/clojurewerkz/cassaforte).
+- Similarly I don't intend to shadow every CCM function only to provide a useful integration API.
+- I test new releases on the current CCM, so you should upgrade CCM-clj and CCM at the same time.
 - Probably doesn't work on Windows. Patches welcome.
 - IPs from 127.0.0.1 to 127.0.0.n will be used, this may require loopback aliasing see Installation.
 - Ports from cql-port to cql-port+3 will be assigned to cql, thrift, jmx and storage respectively.
 - If you abort without cleanup, you may leave CassandraDaemon's running which you can stop from the repl  `(ccm/stop!)` or in the shell `ccm stop`.
+- Using older versions of Cassadra may require snappy-java to be an explicit dependency due to https://github.com/xerial/snappy-java/issues/6
 
-For more see ;; Public in [`src/ccm_clj.clj`](src/ccm_clj.clj#L81) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
+For more see the API in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
 
 ## Tests Usage
 
