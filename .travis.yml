@@ -2,3 +2,5 @@ before_install:
   - ./travis-build.sh
 language: clojure
 lein: lein2
+after_failure: echo  /home/travis/.ccm/repository/last.log
+
