@@ -1,2 +1,4 @@
+before_install:
+  - ./travis-build.sh
 language: clojure
 lein: lein2
