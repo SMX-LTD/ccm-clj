@@ -34,7 +34,7 @@
   ;todo this is pretty suss
   ;Python config parsers do not guess datatypes of values in configuration files, always storing them internally as string,
   ;BUT we'll keyword cos we can't help ourselves."
-  {:pre (true? (and (some? conf-file) (.exists conf-file)))}
+  {:pre (true? (and (not (nil? conf-file)) (.exists conf-file)))}
   (apply array-map (mapcat
                      (fn [line]
                        (let [k (subs line 0 (inc (.indexOf line ":")))
