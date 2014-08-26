@@ -12,11 +12,17 @@
 ;;; Impl
 
 (def ccm-dir (io/file (.getProperty ^Properties (System/getProperties) "user.home") ".ccm"))
+(def default-keyspaces (atom {}))
+(def default-base-port 19100)
+(def jmx-increment (atom 100))
+
+
 
 (defn ccm
   [& cmd]
   (let [quiet (some #{:quiet} cmd)
         cmd* (vec (filter #(not= :quiet %) cmd))
+        cmd* (concat cmd* [:env {}])
         r (apply shell/sh "ccm" cmd*)
         exit (:exit r)
         out (str/trim (.replace (:out r) "\\\\" "\\"))
@@ -27,7 +33,8 @@
     (if (not= err "")
       (log/error (str "CCM => " (str/trim err))))
     (if (not= exit 0)
-      (throw (RuntimeException. (str "CCM failure [" exit "]:" (str/trim (:err r)) " cmd:" cmd*))))
+      (do (log/error (str "cmd:" (str/trim err)))
+          (throw (RuntimeException. (str "CCM failure [" exit "]:" (str/trim (:err r)) " cmd:" cmd*)))))
     r))
 
 (defn conf-as-map [conf-file]

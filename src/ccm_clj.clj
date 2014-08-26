@@ -9,10 +9,6 @@
 ;;;;;;;;;;;;;
 ;;; Public
 
-(def default-keyspaces (atom {}))
-(def default-base-port 19100)
-(def jmx-increment (atom 100))
-
 (defn exec!
   "Execute ccm `cmd`, returns {:err <stderr messages>, :out <stdout messages>, :exit <return code>}"
   [cmd & args]
