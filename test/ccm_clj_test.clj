@@ -16,7 +16,7 @@
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
 
-(expect-no-stderr (new! "ccmcljtest1" "2.0.4" 3 20111))
+(expect-no-stderr (new! "ccmcljtest1" "2.0.9" 3 20111))
 
 ;cql as file
 (expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
@@ -38,7 +38,7 @@
 (expect "ccmclj" (get-default-keyspace))
 
 (expect (not (cluster? "ccmcljtest2")))
-(expect (new! "ccmcljtest2" "2.0.4" 2 20211))
+(expect (new! "ccmcljtest2" "2.0.9" 2 20211))
 (expect "ccmcljtest2" (get-active-cluster))
 (expect (set ["node1" "node2"]) (set (:nodes (get-cluster-conf))))
 (expect (remove! "ccmcljtest2"))
