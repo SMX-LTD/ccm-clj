@@ -55,6 +55,7 @@ I have /Library/LaunchDaemons/moreloopbacks.plist:
 <key>GroupName</key>
 <string>WHEEL</string>
 </dict>
+</plist>
 ```
 
 And then /usr/local/scripts/moreloopbacks.sh:
