@@ -22,8 +22,9 @@
   [& cmd]
   (let [quiet (some #{:quiet} cmd)
         cmd* (vec (filter #(not= :quiet %) cmd))
-        cmd* (concat cmd* [:env {}])
+        cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))])  ;remove lein? prop from env that inteferes with ant
         r (apply shell/sh "ccm" cmd*)
+        cmd* (butlast (butlast cmd*))                       ;remove env from logging
         exit (:exit r)
         out (str/trim (.replace (:out r) "\\\\" "\\"))
         err (str/trim (.replace (:err r) "\\\\" "\\"))]

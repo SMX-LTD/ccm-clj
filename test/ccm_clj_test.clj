@@ -8,10 +8,13 @@
 (def current-keyspace (get-default-keyspace))
 
 (defn tidy-up {:expectations-options :after-run} []
+  (if current-cluster (stop!))
   (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
   (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
   (set-default-keyspace! current-keyspace)
   (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
+
+(tidy-up)
 
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
