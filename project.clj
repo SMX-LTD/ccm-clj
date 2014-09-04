@@ -17,10 +17,10 @@
   :profiles {:1.4    {:dependencies [[org.clojure/clojure "1.4.0"]]}
              :1.5    {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :1.6    {:dependencies [[org.clojure/clojure "1.6.0"]]}
-             :master {:dependencies [[org.clojure/clojure "1.7.0-master-SNAPSHOT"]]}
+             :master {:dependencies [[org.clojure/clojure "1.7.0-alpha1"]]}
              :dev    {:source-paths   ["dev"]
                       :resource-paths ["test/resources"]
-                      :dependencies   [[expectations "2.0.7"]
+                      :dependencies   [[expectations "2.0.9"]
                                        [ch.qos.logback/logback-classic "1.0.13"]
                                        [ch.qos.logback/logback-core "1.0.13"]]}}
   :aliases {"all" ["with-profile" "+dev:+1.4:+1.5:+1.6:+master"]})
