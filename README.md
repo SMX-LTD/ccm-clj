@@ -1,6 +1,6 @@
 # CCM-clj
 
-A Clojure (1.4+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
+A Clojure (1.5+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
 
 ## Current Version
 

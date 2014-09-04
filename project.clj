@@ -14,8 +14,7 @@
                  "sonatype-snapshots" {:url       "http://oss.sonatype.org/content/repositories/snapshots"
                                        :snapshots true
                                        :releases  {:checksum :fail :update :always}}}
-  :profiles {:1.4    {:dependencies [[org.clojure/clojure "1.4.0"]]}
-             :1.5    {:dependencies [[org.clojure/clojure "1.5.1"]]}
+  :profiles {:1.5    {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :1.6    {:dependencies [[org.clojure/clojure "1.6.0"]]}
              :master {:dependencies [[org.clojure/clojure "1.7.0-alpha1"]]}
              :dev    {:source-paths   ["dev"]
