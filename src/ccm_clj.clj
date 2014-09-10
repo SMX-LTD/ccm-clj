@@ -128,7 +128,7 @@
           "-t" (str ip ":" thrift)
           (str "--binary-itf=" (str ip ":" cql))
           node-name)
-     (log/info "Added node " node-name "@" (str ip ":" cql)))))
+     (log/info "Added node" node-name "@" (str ip ":" cql)))))
 
 (defn remove-node! [node-name]
   "Remove node `node-name` from active cluster."

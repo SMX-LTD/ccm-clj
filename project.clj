@@ -22,4 +22,4 @@
                       :dependencies   [[expectations "2.0.9"]
                                        [ch.qos.logback/logback-classic "1.0.13"]
                                        [ch.qos.logback/logback-core "1.0.13"]]}}
-  :aliases {"all" ["with-profile" "+dev:+1.4:+1.5:+1.6:+master"]})
+  :aliases {"all" ["with-profile" "+dev:+1.5:+1.6:+master"]})

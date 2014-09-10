@@ -11,7 +11,7 @@
   (if current-cluster (stop!))
   (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
   (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
-  (set-default-keyspace! current-keyspace)
+  (if current-keyspace (set-default-keyspace! current-keyspace))
   (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
 
 (tidy-up)
