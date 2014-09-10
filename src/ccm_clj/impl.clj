@@ -16,13 +16,23 @@
 (def default-base-port 19100)
 (def jmx-increment (atom 100))
 
+(defn get-active []
+  (if (.exists ^File (io/file ccm-dir "CURRENT"))
+    (str/trim (slurp (io/file ccm-dir "CURRENT")))
+    nil))
 
+(defn ensure-active []
+  (if (get-active)
+    true
+    (do
+      (log/error "No active cluster")
+      false)))
 
 (defn ccm
   [& cmd]
   (let [quiet (some #{:quiet} cmd)
         cmd* (vec (filter #(not= :quiet %) cmd))
-        cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))])  ;remove lein? prop from env that inteferes with ant
+        cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))]) ;remove lein? prop from env that inteferes with ant
         r (apply shell/sh "ccm" cmd*)
         cmd* (butlast (butlast cmd*))                       ;remove env from logging
         exit (:exit r)
@@ -34,7 +44,7 @@
     (if (not= err "")
       (log/error (str "CCM => " (str/trim err))))
     (if (not= exit 0)
-      (do (log/error (str "cmd:" (str/trim err)))
+      (do (log/error (str "cmd: " (str/trim err)))
           (throw (RuntimeException. (str "CCM failure [" exit "]:" (str/trim (:err r)) " cmd:" cmd*)))))
     r))
 
@@ -46,15 +56,15 @@
   (apply array-map (mapcat
                      (fn [line]
                        (let [k (subs line 0 (inc (.indexOf line ":")))
-                             v (subs line (inc (.indexOf line ":")))]      ;todo comments multi-lines
+                             v (subs line (inc (.indexOf line ":")))] ;todo comments multi-lines
                          (letfn [(realize [i]
                                           (let [i (str/trim i)]
-                                                (cond
-                                                  (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
-                                                  (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))
-                                                  (.endsWith i ":") (keyword (subs i 0 (dec (.length i))))
-                                                  (= i "null") nil
-                                                  :else i)))]
+                                            (cond
+                                              (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
+                                              (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))
+                                              (.endsWith i ":") (keyword (subs i 0 (dec (.length i))))
+                                              (= i "null") nil
+                                              :else i)))]
                            [(realize k) (realize v)])))
                      (re-seq #"[^\n]+" (slurp conf-file)))))
 

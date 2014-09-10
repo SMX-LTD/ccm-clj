@@ -18,9 +18,7 @@
 (defn get-active-cluster
   "Get name of active cluster"
   []
-  (if (.exists ^File (io/file ccm-dir "CURRENT"))
-    (str/trim (slurp (io/file ccm-dir "CURRENT")))
-    nil))
+  (get-active))
 
 (defn cluster?
   "Is `name` found in list of CCM clusters."
@@ -30,9 +28,8 @@
 (defn set-default-keyspace!
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
   ([keyspace]
-   (if get-active-cluster
-     (swap! default-keyspaces assoc (get-active-cluster) keyspace)
-     (log/error "No active cluster to set default keyspace on")))
+   (if (ensure-active)
+     (set-default-keyspace! (get-active-cluster) keyspace)))
   ([cluster keyspace]
    (if (cluster? cluster)
      (swap! default-keyspaces assoc cluster keyspace)
@@ -41,14 +38,16 @@
 (defn get-default-keyspace
   "Get name of default keyspace of `cluster` or active cluster"
   ([]
-   (@default-keyspaces (get-active-cluster)))
+   (if (ensure-active)
+     (@default-keyspaces (get-active-cluster))))
   ([cluster]
    (@default-keyspaces cluster)))
 
 (defn get-cluster-conf
   "Get a map of the cluster conf"
   ([]
-   (if (get-active-cluster) (get-cluster-conf (get-active-cluster)) nil))
+   (if (ensure-active)
+     (get-cluster-conf (get-active-cluster))))
   ([name]
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
@@ -95,7 +94,7 @@
 (defn stop!
   "Stop the current CCM cluster."
   []
-  (if (get-active-cluster)
+  (if (ensure-active)
     (let [result (ccm "stop")]
       (log/info (str (get-active-cluster) " cluster stopped"))
       result)
@@ -110,9 +109,9 @@
     result))
 
 (defn add-node!
-  "Add node `node-name` at next available loopback from active cluster."
+  "Add node `node-name` at next available loopback to active cluster."
   ([node-name ip ports-spec]
-   (if (not (or ports-spec (:cql ports-spec)))
+   (if (and (ensure-active) (not (or ports-spec (:cql ports-spec))))
      (throw (IllegalArgumentException. "Ports spec must be  a cql port OR map containing :cql port")))
 
    (let [ports-spec (if-not (map? ports-spec) {:cql ports-spec} ports-spec)
@@ -131,10 +130,10 @@
           node-name)
      (log/info "Added node " node-name "@" (str ip ":" cql)))))
 
-
 (defn remove-node! [node-name]
   "Remove node `node-name` from active cluster."
-  (ccm node-name "remove"))
+  (if (ensure-active)
+    (ccm node-name "remove")))
 
 (defn new!
   "Create and start cluster.

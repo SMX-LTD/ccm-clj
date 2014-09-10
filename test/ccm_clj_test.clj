@@ -48,16 +48,11 @@
 (expect nil (get-active-cluster))
 
 (expect (switch! "ccmcljtest1"))
-(expect (stop!))
 (expect (start! "ccmcljtest1"))
-(expect (switch! "ccmcljtest1"))
-(expect "ccmcljtest1" (get-active-cluster))
-
 
 (expect (hash-set "node1" "node2" "node3" "node4")
-        (do (add-node! "node4" "127.0.0.4" 20111)
+        (do (add-node! "node4" "127.0.0.4" 20115)
             (set (:nodes (get-cluster-conf)))))
-
 (expect (remove-node! "node4"))
 (expect (hash-set "node1" "node2" "node3") (set (:nodes (get-cluster-conf))))
 
