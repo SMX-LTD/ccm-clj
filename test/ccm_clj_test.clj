@@ -7,7 +7,7 @@
 (def current-cluster (get-active-cluster))
 (def current-keyspace (get-default-keyspace))
 
-(defn tidy-up {:expectations-options :after-run} []
+(defn tidy-up []
   (if current-cluster (stop!))
   (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
   (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
@@ -53,6 +53,12 @@
 (expect (hash-set "node1" "node2" "node3" "node4")
         (do (add-node! "node4" "127.0.0.4" 20115)
             (set (:nodes (get-cluster-conf)))))
+
+(expect (flush! "node4"))
+
 (expect (remove-node! "node4"))
 (expect (hash-set "node1" "node2" "node3") (set (:nodes (get-cluster-conf))))
 
+;savepoint and rollback
+(expect (savepoint! "testsave"))
+(expect (reset! "testsave"))

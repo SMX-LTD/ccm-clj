@@ -100,6 +100,17 @@
       result)
     (log/info "No active cluster to stop")))
 
+(defn flush!
+  "If `node-same` flush that node on active cluster, else flush all nodes"
+  ([]
+   (let [result (ccm "flush")]
+     (log/info (str (get-active-cluster) " cluster flush attmepted (check for errors in output)"))
+     result))
+  ([node-name]
+   (let [result (ccm "flush")]
+     (log/info (str node-name " node flush attempted (check for errors in output)"))
+     result)))
+
 (defn remove!
   "Remove cluster `name` from CCM including ALL DATA, resetting active cluster if `name`"
   [name]
@@ -161,3 +172,32 @@
    (start! name)
    (switch! name)))
 
+(defn savepoint? [name]
+  (.exists (io/file savepoint-dir (get-active-cluster) name)))
+
+(defn savepoint! [name]
+  "Create savepoint `name` from active cluster that can be reset to via `rollback!`."
+  (if (ensure-active)
+    (let [cluster-savepoint-dir (io/file savepoint-dir (get-active-cluster))]
+      (if-not (.exists cluster-savepoint-dir)
+        (.mkdirs cluster-savepoint-dir))
+      (let [save-dir (io/file cluster-savepoint-dir name)
+            cluster-dir (io/file ccm-dir (get-active-cluster))]
+        (flush!)
+        (if (copy-dir cluster-dir save-dir)
+          (do (log/info "Created savepoint" name)
+              true)
+          (log/error "Failed to create savepoint " name))))
+    (log/error "No active cluster for savepoint")))
+
+(defn reset! [savepoint]
+  "Rollback active cluster dir to savepoint `name`"
+  (if (ensure-active)
+    (let [save-dir (io/file savepoint-dir (get-active-cluster) savepoint)
+          cluster-dir (io/file ccm-dir (get-active-cluster))]
+      (stop!)
+      (if (copy-dir save-dir cluster-dir)
+        (do (log/info "Rolled back to savepoint" savepoint)
+            (start! (get-active-cluster)))
+        (log/error "Failed to rollback to savepoint " savepoint)))
+    (log/error "No active cluster to rollback")))
