@@ -101,7 +101,7 @@
     (log/info "No active cluster to stop")))
 
 (defn flush!
-  "If `node-same` flush that node on active cluster, else flush all nodes"
+  "If `node-name` flush that node on active cluster, else flush all nodes"
   ([]
    (let [result (ccm "flush")]
      (log/info (str (active-cluster) " cluster flush attmepted (check for errors in output)"))
