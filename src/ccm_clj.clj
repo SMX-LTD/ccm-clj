@@ -15,7 +15,7 @@
   (log/info "??")
   (apply ccm cmd args))
 
-(defn get-active-cluster
+(defn active-cluster
   "Get name of active cluster"
   []
   (get-active))
@@ -29,7 +29,7 @@
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
   ([keyspace]
    (if (ensure-active)
-     (set-default-keyspace! (get-active-cluster) keyspace)))
+     (set-default-keyspace! (active-cluster) keyspace)))
   ([cluster keyspace]
    (if (cluster? cluster)
      (swap! default-keyspaces assoc cluster keyspace)
@@ -39,7 +39,7 @@
   "Get name of default keyspace of `cluster` or active cluster"
   ([]
    (if (ensure-active)
-     (@default-keyspaces (get-active-cluster))))
+     (@default-keyspaces (active-cluster))))
   ([cluster]
    (@default-keyspaces cluster)))
 
@@ -47,15 +47,15 @@
   "Get a map of the cluster conf"
   ([]
    (if (ensure-active)
-     (get-cluster-conf (get-active-cluster))))
+     (get-cluster-conf (active-cluster))))
   ([name]
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
 (defn get-node-conf
   "Get a map of the conf for the node `name` from active cluster"
   ([name]
-   {:pre (= (get-active-cluster) nil)}
-   (conf-as-map (io/file ccm-dir (get-active-cluster) name (str name ".conf")))))
+   {:pre (= (active-cluster) nil)}
+   (conf-as-map (io/file ccm-dir (active-cluster) name (str name ".conf")))))
 
 (defn start!
   "Start CCM cluster `name`."
@@ -68,7 +68,7 @@
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
   Note this is a convienent way of loading schemas and seed data, and shouldn't be used in place of a proper CQL client like Alia or Cassaforte."
   ([cmd-source]
-   (cql! cmd-source (@default-keyspaces get-active-cluster) "" "node1"))
+   (cql! cmd-source (@default-keyspaces active-cluster) "" "node1"))
   ([cmd-source keyspace]
    (cql! cmd-source keyspace "" "node1"))
   ([cmd-source keyspace log-name]
@@ -96,7 +96,7 @@
   []
   (if (ensure-active)
     (let [result (ccm "stop")]
-      (log/info (str (get-active-cluster) " cluster stopped"))
+      (log/info (str (active-cluster) " cluster stopped"))
       result)
     (log/info "No active cluster to stop")))
 
@@ -104,7 +104,7 @@
   "If `node-same` flush that node on active cluster, else flush all nodes"
   ([]
    (let [result (ccm "flush")]
-     (log/info (str (get-active-cluster) " cluster flush attmepted (check for errors in output)"))
+     (log/info (str (active-cluster) " cluster flush attmepted (check for errors in output)"))
      result))
   ([node-name]
    (let [result (ccm "flush")]
@@ -172,32 +172,47 @@
    (start! name)
    (switch! name)))
 
-(defn savepoint? [name]
-  (.exists (io/file savepoint-dir (get-active-cluster) name)))
+(defn savepoint?
+  "Is `name` a savepoint of active cluster or `cluster`."
+  ([name]
+   (if (ensure-active)
+     (savepoint? (active-cluster) name)))
+  ([cluster name]
+   (.exists (io/file savepoint-dir cluster name))))
 
-(defn savepoint! [name]
-  "Create savepoint `name` from active cluster that can be reset to via `rollback!`."
-  (if (ensure-active)
-    (let [cluster-savepoint-dir (io/file savepoint-dir (get-active-cluster))]
-      (if-not (.exists cluster-savepoint-dir)
-        (.mkdirs cluster-savepoint-dir))
-      (let [save-dir (io/file cluster-savepoint-dir name)
-            cluster-dir (io/file ccm-dir (get-active-cluster))]
-        (flush!)
-        (if (copy-dir cluster-dir save-dir)
-          (do (log/info "Created savepoint" name)
-              true)
-          (log/error "Failed to create savepoint " name))))
-    (log/error "No active cluster for savepoint")))
+(defn savepoint!
+  "Create savepoint `name` from `cluster` or active cluster that can be reset to via `rollback!`."
+  ([name]
+   (if (ensure-active)
+     (savepoint! (active-cluster) name)
+     false))
+  ([cluster name]
+   (let [cluster-savepoint-dir (io/file savepoint-dir cluster)]
+     (if-not (.exists cluster-savepoint-dir)
+       (.mkdirs cluster-savepoint-dir))
+     (let [save-dir (io/file cluster-savepoint-dir name)
+           cluster-dir (io/file ccm-dir cluster)]
+       (flush!)
+       (if (copy-dir cluster-dir save-dir)
+         (do (log/info "Created savepoint " name " in cluster " cluster)
+             true)
+         (do (log/error "Failed to create savepoint " name " in cluster " cluster)
+             false))))))
 
-(defn reset! [savepoint]
+(defn reset!
   "Rollback active cluster dir to savepoint `name`"
-  (if (ensure-active)
-    (let [save-dir (io/file savepoint-dir (get-active-cluster) savepoint)
-          cluster-dir (io/file ccm-dir (get-active-cluster))]
-      (stop!)
-      (if (copy-dir save-dir cluster-dir)
-        (do (log/info "Rolled back to savepoint" savepoint)
-            (start! (get-active-cluster)))
-        (log/error "Failed to rollback to savepoint " savepoint)))
-    (log/error "No active cluster to rollback")))
+  ([savepoint]
+   (if (ensure-active)
+     (reset! savepoint (active-cluster))))
+  ([savepoint cluster]
+   (if (ensure-active)
+     (let [save-dir (io/file savepoint-dir cluster savepoint)
+           cluster-dir (io/file ccm-dir cluster)]
+       (stop!)
+       (if (copy-dir save-dir cluster-dir)
+         (do (log/info "Rolled back to savepoint" savepoint)
+             (start! (active-cluster))
+             true)
+         (do (log/error "Failed to rollback to savepoint " savepoint)
+             false)))
+     (log/error "No active cluster to rollback"))))

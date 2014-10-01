@@ -4,7 +4,7 @@
             [ccm-clj :refer :all]))
 
 (def existing (get-clusters))
-(def current-cluster (get-active-cluster))
+(def current-cluster (active-cluster))
 (def current-keyspace (get-default-keyspace))
 
 (defn tidy-up []
@@ -35,17 +35,17 @@
 
 (expect (set ["node1" "node2" "node3"]) (set (:nodes (get-cluster-conf))))
 
-(expect "ccmcljtest1" (get-active-cluster))
+(expect "ccmcljtest1" (active-cluster))
 (expect (conj (set existing) "ccmcljtest1") (set (get-clusters)))
 (expect (cluster? "ccmcljtest1"))
 (expect "ccmclj" (get-default-keyspace))
 
 (expect (not (cluster? "ccmcljtest2")))
 (expect (new! "ccmcljtest2" "2.0.9" 2 20211))
-(expect "ccmcljtest2" (get-active-cluster))
+(expect "ccmcljtest2" (active-cluster))
 (expect (set ["node1" "node2"]) (set (:nodes (get-cluster-conf))))
 (expect (remove! "ccmcljtest2"))
-(expect nil (get-active-cluster))
+(expect nil (active-cluster))
 
 (expect (switch! "ccmcljtest1"))
 (expect (start! "ccmcljtest1"))
