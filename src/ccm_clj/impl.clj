@@ -12,9 +12,28 @@
 ;;; Impl
 
 (def ccm-dir (io/file (.getProperty ^Properties (System/getProperties) "user.home") ".ccm"))
+(def savepoint-dir (io/file ccm-dir "savepoints"))
+(if (not (.exists savepoint-dir)) (.mkdir savepoint-dir))
+
 (def default-keyspaces (atom {}))
 (def default-base-port 19100)
 (def jmx-increment (atom 100))
+
+;;todo use in (ccm
+(defn shell-exec [& cmd]                                    ;; protocol for windows?
+  (let [r (apply shell/sh cmd)
+        out (str/trim (.replace (:out r) "\\\\" "\\"))
+        err (str/trim (.replace (:err r) "\\\\" "\\"))
+        exit (:exit r)
+        result (or (not= exit 0) (= err ""))]
+    (when-not result
+      (log/error "Cmd failure, exit code => " exit)
+      (log/error "Cmd stderr => " (str/trim err)))
+    result))
+
+(defn copy-dir [from-dir to-dir]
+  "Assumes parents all exist"
+  (shell-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir)))
 
 (defn get-active []
   (if (.exists ^File (io/file ccm-dir "CURRENT"))
