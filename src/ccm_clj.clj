@@ -20,6 +20,13 @@
   []
   (get-active))
 
+(defn get-active-cluster
+  "Deprecated use `(active-cluster)`"
+  {:deprecated "0.1.6"}
+  []
+  (log/warn "Deprecated for `(active-cluster)`")
+  (active-cluster))
+
 (defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
@@ -151,7 +158,6 @@
   `num-nodes` Cassandra nodes will be running using ports inferred from ports-spec
   Those loopbacks may need to be aliased depending on OS.
   Ports from cql-port to cql-port + 3 will be used."
-
   ([name version num-nodes]
    (new! name version num-nodes {}))
   ([name version num-nodes ports-spec]
@@ -167,7 +173,8 @@
                  :let [ip (str "127.0.0." i)
                        node-name (str "node" i)
                        cql (:cql ports-spec)]]
-           (add-node! node-name ip {:cql cql})))
+           (add-node! node-name ip {:cql cql})
+           (log/info "Added node" node-name "at" ip ":" cql)))
        (log/info "Found existing cluster at" cluster-dir)))
    (start! name)
    (switch! name)))
@@ -194,25 +201,49 @@
            cluster-dir (io/file ccm-dir cluster)]
        (flush!)
        (if (copy-dir cluster-dir save-dir)
-         (do (log/info "Created savepoint " name " in cluster " cluster)
+         (do (log/info "Created savepoint" name "in cluster" cluster)
              true)
-         (do (log/error "Failed to create savepoint " name " in cluster " cluster)
+         (do (log/error "Failed to create savepoint" name "in cluster " cluster)
              false))))))
 
-(defn reset!
-  "Rollback active cluster dir to savepoint `name`"
+(defn restore!
+  "Rollback active cluster or `cluster` to savepoint `name` and start the cluster"
   ([savepoint]
    (if (ensure-active)
-     (reset! savepoint (active-cluster))))
-  ([savepoint cluster]
+     (restore! savepoint (active-cluster))))
+  ([cluster savepoint]
+   (let [save-dir (io/file savepoint-dir cluster savepoint)
+         cluster-dir (io/file ccm-dir cluster)]
+     (stop!)
+     (if (copy-dir save-dir cluster-dir)
+       (do (log/info "Rolled back to savepoint" savepoint)
+           (start! cluster)
+           true)
+       (do (log/error "Failed to rollback to savepoint " savepoint)
+           false)))))
+
+(defn remove-savepoint!
+  "Remove `savepoint` from active cluster or `cluster` if supplied"
+  ([savepoint]
    (if (ensure-active)
-     (let [save-dir (io/file savepoint-dir cluster savepoint)
-           cluster-dir (io/file ccm-dir cluster)]
-       (stop!)
-       (if (copy-dir save-dir cluster-dir)
-         (do (log/info "Rolled back to savepoint" savepoint)
-             (start! (active-cluster))
-             true)
-         (do (log/error "Failed to rollback to savepoint " savepoint)
-             false)))
-     (log/error "No active cluster to rollback"))))
+     (remove-savepoint! (active-cluster) savepoint)))
+  ([cluster savepoint]
+   (let [save-dir (io/file savepoint-dir cluster savepoint)]
+     (if (del-dir save-dir)
+       (do (log/info "Deleted savepoint" savepoint "in cluster" cluster)
+           true)
+       (do (log/error "Failed to deleted savepoint" savepoint "in cluster" cluster)
+           false)))))
+
+(defn remove-savepoints!
+  "Remove all savepoints from active cluster or `cluster` if supplied"
+  ([]
+   (if (ensure-active)
+     (remove-savepoints! (active-cluster))))
+  ([cluster]
+   (let [save-dir (io/file savepoint-dir cluster)]
+     (if (del-dir save-dir)
+       (do (log/info "Deleted savepoints for " cluster)
+           true)
+       (do (log/error "Failed to deleted savepoints for " cluster)
+           false)))))

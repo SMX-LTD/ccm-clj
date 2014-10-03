@@ -12,6 +12,8 @@
   (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
   (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
   (if current-keyspace (set-default-keyspace! current-keyspace))
+  (remove-savepoints! "ccmcljtest1")
+  (remove-savepoints! "ccmcljtest1")
   (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
 
 (tidy-up)
@@ -61,4 +63,9 @@
 
 ;savepoint and rollback
 (expect (savepoint! "testsave"))
-(expect (reset! "testsave"))
+(expect (restore! "testsave"))
+(expect (remove-savepoint! "testsave"))
+(expect (savepoint! "testsave1"))
+(expect (savepoint! "testsave2"))
+(expect (remove-savepoints!))
+

@@ -35,6 +35,10 @@
   "Assumes parents all exist"
   (shell-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir)))
 
+(defn del-dir [dir]
+  (shell-exec "rm" "-r" (.getAbsolutePath dir)))
+
+
 (defn get-active []
   (if (.exists ^File (io/file ccm-dir "CURRENT"))
     (str/trim (slurp (io/file ccm-dir "CURRENT")))
