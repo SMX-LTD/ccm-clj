@@ -24,12 +24,11 @@
   (let [r (apply shell/sh cmd)
         out (str/trim (.replace (:out r) "\\\\" "\\"))
         err (str/trim (.replace (:err r) "\\\\" "\\"))
-        exit (:exit r)
-        result (or (not= exit 0) (= err ""))]
-    (when-not result
+        exit (:exit r)]
+    (when-not (or (not= exit 0) (= err ""))
       (log/error "Cmd failure, exit code => " exit)
       (log/error "Cmd stderr => " (str/trim err)))
-    result))
+    r))
 
 (defn copy-dir [from-dir to-dir]
   "Assumes parents all exist"
@@ -42,6 +41,10 @@
    (try (shell-exec "rm" "-r" (.getAbsolutePath dir))
         (catch Exception e (if-not silently (throw e))))))
 
+;todo use rsync
+(defn sync-dir [from-dir to-dir]
+  "Assumes parents all exist, syncs contents of `from-dir with `to-dir`"
+  (shell-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir)))
 
 (defn get-active []
   (if (.exists ^File (io/file ccm-dir "CURRENT"))

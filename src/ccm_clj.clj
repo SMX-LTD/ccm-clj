@@ -219,8 +219,8 @@
    (let [save-dir (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
      (if (active-cluster) (stop!))
-     (if (copy-dir save-dir cluster-dir)
-       (do (log/info "Rolled back to savepoint" savepoint)
+     (if (sync-dir save-dir cluster-dir)
+       (do (log/info "Restored to savepoint" savepoint)
            (start! cluster)
            true)
        (do (log/error "Failed to rollback to savepoint " savepoint)
