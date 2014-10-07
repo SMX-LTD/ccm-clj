@@ -35,8 +35,12 @@
   "Assumes parents all exist"
   (shell-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir)))
 
-(defn del-dir [dir]
-  (shell-exec "rm" "-r" (.getAbsolutePath dir)))
+(defn del-dir
+  ([dir]
+   (del-dir dir false))
+  ([dir silently]
+   (try (shell-exec "rm" "-r" (.getAbsolutePath dir))
+        (catch Exception e (if-not silently (throw e))))))
 
 
 (defn get-active []
@@ -64,7 +68,7 @@
     (if-not quiet (log/info "cmd:" cmd*))
     (if (and (not quiet) (not= out "") (not (.contains (:out r) "JavaLaunchHelper"))) ;java logging bug
       (log/info (str "CCM => " (str/trim out))))
-    (if (not= err "")
+    (if (and (not= err "") (not (.contains (:err r) "JavaLaunchHelper")))
       (log/error (str "CCM => " (str/trim err))))
     (if (not= exit 0)
       (do (log/error (str "cmd: " (str/trim err)))

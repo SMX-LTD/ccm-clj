@@ -30,7 +30,7 @@
 (defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
-  (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet))))
+  (some? (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet)))))
 
 (defn set-default-keyspace!
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
@@ -66,10 +66,13 @@
 
 (defn start!
   "Start CCM cluster `name`."
-  [name]
-  (let [result (ccm "start")]
-    (log/info (str name " cluster started"))
-    result))
+  ([]
+   (if (ensure-active)
+     (start! (active-cluster))))
+  ([name]
+   (let [result (ccm "start")]
+     (log/info (str name " cluster started"))
+     result)))
 
 (defn cql!
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
@@ -204,6 +207,7 @@
          (do (log/info "Created savepoint" name "in cluster" cluster)
              true)
          (do (log/error "Failed to create savepoint" name "in cluster " cluster)
+             (del-dir save-dir true)
              false))))))
 
 (defn restore!
@@ -214,7 +218,7 @@
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
-     (stop!)
+     (if (active-cluster) (stop!))
      (if (copy-dir save-dir cluster-dir)
        (do (log/info "Rolled back to savepoint" savepoint)
            (start! cluster)
