@@ -56,8 +56,6 @@
 
 (defn del-dir
   ([dir]
-   (del-dir dir false))
-  ([dir silently]
    (try (sh-exec "rm" "-r" (.getAbsolutePath dir) )
         (catch Exception e (throw e)))))
 
