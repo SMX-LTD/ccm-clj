@@ -30,7 +30,7 @@
 (defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
-  (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet))))
+  (some? (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet)))))
 
 (defn set-default-keyspace!
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
@@ -66,10 +66,13 @@
 
 (defn start!
   "Start CCM cluster `name`."
-  [name]
-  (let [result (ccm "start")]
-    (log/info (str name " cluster started"))
-    result))
+  ([]
+   (if (ensure-active)
+     (start! (active-cluster))))
+  ([name]
+   (let [result (ccm "start")]
+     (log/info (str name " cluster started"))
+     result)))
 
 (defn cql!
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
@@ -83,7 +86,7 @@
   ([cmd-source keyspace log-name node-name]
    (let [thing cmd-source
          result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) (as-cqlsh-arg thing)))]
-     (log/info (str log-name " load finished of " (to-str cmd-source) " (check for errors in output)"))
+     (log/info (str log-name "load finished of " (to-str cmd-source) " (check for errors in output)"))
      result)))
 
 (defn switch!
@@ -111,11 +114,11 @@
   "If `node-name` flush that node on active cluster, else flush all nodes"
   ([]
    (let [result (ccm "flush")]
-     (log/info (str (active-cluster) " cluster flush attmepted (check for errors in output)"))
+     (log/info (str (active-cluster) " node flushed"))
      result))
   ([node-name]
    (let [result (ccm "flush")]
-     (log/info (str node-name " node flush attempted (check for errors in output)"))
+     (log/info (str node-name " node flushed"))
      result)))
 
 (defn remove!
@@ -157,7 +160,8 @@
   "Create and start cluster.
   `num-nodes` Cassandra nodes will be running using ports inferred from ports-spec
   Those loopbacks may need to be aliased depending on OS.
-  Ports from cql-port to cql-port + 3 will be used."
+  A an optional map `ports-spec` can be used to supply some of :cql :storage :thift :jmx port,
+  else ports from cql-port to cql-port + 3 will be used."
   ([name version num-nodes]
    (new! name version num-nodes {}))
   ([name version num-nodes ports-spec]
@@ -204,19 +208,20 @@
          (do (log/info "Created savepoint" name "in cluster" cluster)
              true)
          (do (log/error "Failed to create savepoint" name "in cluster " cluster)
+             (del-dir save-dir true)
              false))))))
 
 (defn restore!
   "Rollback active cluster or `cluster` to savepoint `name` and start the cluster"
   ([savepoint]
    (if (ensure-active)
-     (restore! savepoint (active-cluster))))
+     (restore! (active-cluster) savepoint)))
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
-     (stop!)
-     (if (copy-dir save-dir cluster-dir)
-       (do (log/info "Rolled back to savepoint" savepoint)
+     (if (active-cluster) (stop!))
+     (if (sync-dir save-dir cluster-dir)
+       (do (log/info "Restored to savepoint" savepoint)
            (start! cluster)
            true)
        (do (log/error "Failed to rollback to savepoint " savepoint)

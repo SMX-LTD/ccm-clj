@@ -97,6 +97,7 @@ done
 - Ports from cql-port to cql-port+3 will be assigned to CQL, thrift, JMX and storage respectively.
 - If you abort without cleanup, you may leave CassandraDaemon(s) running which you can stop from the repl `(ccm/stop!)` or in the shell `ccm stop`.
 - Using older versions of Cassandra may require Snappy-Java to be an explicit dependency due to https://github.com/xerial/snappy-java/issues/6
+- Error: Could not find or load main class org.apache.cassandra.service.CassandraDaemon might mean an interrupted download, try blowing away .ccm.
 
 For more see the API in [`src/ccm_clj.clj`](src/ccm_clj.clj) or tests in [`test/ccm_clj_test.clj`](test/ccm_clj_test.clj).
 

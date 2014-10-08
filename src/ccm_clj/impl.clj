@@ -19,30 +19,58 @@
 (def default-base-port 19100)
 (def jmx-increment (atom 100))
 
-;;todo use in (ccm
-(defn shell-exec [& cmd]                                    ;; protocol for windows?
-  (let [r (apply shell/sh cmd)
-        out (str/trim (.replace (:out r) "\\\\" "\\"))
-        err (str/trim (.replace (:err r) "\\\\" "\\"))
-        exit (:exit r)
-        result (or (not= exit 0) (= err ""))]
-    (when-not result
-      (log/error "Cmd failure, exit code => " exit)
-      (log/error "Cmd stderr => " (str/trim err)))
-    result))
+(defn filter-mods [cmd*]
+  (let [[mods cmd] ((juxt filter remove) #{:quiet :quiet!} cmd*)]
+    [(set mods) cmd]))
 
-(defn copy-dir [from-dir to-dir]
+(defn sh-exec
+  [& cmd]
+  (let [[mods cmd*] (filter-mods cmd)
+        ;remove lein? prop from env that inteferes with ant
+        cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))])
+        r (apply shell/sh cmd*)
+        r (-> r
+              (assoc :cmd (butlast (butlast cmd*)))         ;remove env from logging
+              (assoc :out (str/trim (.replace (:out r) "\\\\" "\\")))
+              (assoc :err (str/trim (.replace (:err r) "\\\\" "\\"))))
+        exit (:exit r)]
+    (when-not (or (:quiet! mods) (= exit 0))
+      (log/error "sh.exit =" exit))
+    (when-not (or (:quiet! mods) (= (:err r) "") (.contains (:err r) "JavaLaunchHelper"))
+      (log/error "sh.<err> =>" (:err r)))
+    r))
+
+(defn ccm [& cmd]
+  (let [[mods _] (filter-mods cmd)
+        _ (if-not (or (some mods [:quiet :quiet!]))
+            (log/info (apply str "sh <= ccm " (str/join " " (map name cmd)))))
+        r (apply sh-exec "ccm" cmd)]
+    (if (and (not (:quiet! mods)) (not= (:exit r) 0))
+      (throw (ex-info (str "ccm.<err> => " (str/trim (:err r))) r))
+      r)))
+
+(defn copy-dir
   "Assumes parents all exist"
-  (shell-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir)))
+  [from-dir to-dir]
+  (sh-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir)))
 
-(defn del-dir [dir]
-  (shell-exec "rm" "-r" (.getAbsolutePath dir)))
+(defn del-dir
+  ([dir]
+   (del-dir dir false))
+  ([dir silently]
+   (try (sh-exec "rm" "-r" (.getAbsolutePath dir) )
+        (catch Exception e (throw e)))))
 
+(defn sync-dir
+  "Assumes parents all exist, syncs contents of `from-dir with `to-dir`"
+  [from-dir to-dir]
+  (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir)))
 
 (defn get-active []
-  (if (.exists ^File (io/file ccm-dir "CURRENT"))
-    (str/trim (slurp (io/file ccm-dir "CURRENT")))
-    nil))
+  (let [current (io/file ccm-dir "CURRENT")]
+    (if (.exists current)
+      (str/trim (slurp current))
+      nil)))
 
 (defn ensure-active []
   (if (get-active)
@@ -50,26 +78,6 @@
     (do
       (log/error "No active cluster")
       false)))
-
-(defn ccm
-  [& cmd]
-  (let [quiet (some #{:quiet} cmd)
-        cmd* (vec (filter #(not= :quiet %) cmd))
-        cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))]) ;remove lein? prop from env that inteferes with ant
-        r (apply shell/sh "ccm" cmd*)
-        cmd* (butlast (butlast cmd*))                       ;remove env from logging
-        exit (:exit r)
-        out (str/trim (.replace (:out r) "\\\\" "\\"))
-        err (str/trim (.replace (:err r) "\\\\" "\\"))]
-    (if-not quiet (log/info "cmd:" cmd*))
-    (if (and (not quiet) (not= out "") (not (.contains (:out r) "JavaLaunchHelper"))) ;java logging bug
-      (log/info (str "CCM => " (str/trim out))))
-    (if (not= err "")
-      (log/error (str "CCM => " (str/trim err))))
-    (if (not= exit 0)
-      (do (log/error (str "cmd: " (str/trim err)))
-          (throw (RuntimeException. (str "CCM failure [" exit "]:" (str/trim (:err r)) " cmd:" cmd*)))))
-    r))
 
 (defn conf-as-map [conf-file]
   ;todo this is pretty suss

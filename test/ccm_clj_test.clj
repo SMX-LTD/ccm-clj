@@ -13,7 +13,7 @@
   (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
   (if current-keyspace (set-default-keyspace! current-keyspace))
   (remove-savepoints! "ccmcljtest1")
-  (remove-savepoints! "ccmcljtest1")
+  (remove-savepoints! "ccmcljtest2")
   (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
 
 (tidy-up)
@@ -61,7 +61,7 @@
 (expect (remove-node! "node4"))
 (expect (hash-set "node1" "node2" "node3") (set (:nodes (get-cluster-conf))))
 
-;savepoint and rollback
+;savepoint and rollback though these tests dont do much todo
 (expect (savepoint! "testsave"))
 (expect (restore! "testsave"))
 (expect (remove-savepoint! "testsave"))
