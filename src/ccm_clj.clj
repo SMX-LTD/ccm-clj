@@ -160,7 +160,8 @@
   "Create and start cluster.
   `num-nodes` Cassandra nodes will be running using ports inferred from ports-spec
   Those loopbacks may need to be aliased depending on OS.
-  Ports from cql-port to cql-port + 3 will be used."
+  A an optional map `ports-spec` can be used to supply some of :cql :storage :thift :jmx port,
+  else ports from cql-port to cql-port + 3 will be used."
   ([name version num-nodes]
    (new! name version num-nodes {}))
   ([name version num-nodes ports-spec]
