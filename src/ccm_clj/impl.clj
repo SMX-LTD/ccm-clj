@@ -11,6 +11,14 @@
 ;;;;;;;;;;;;;
 ;;; Impl
 
+
+;; I keep using it, so..
+(defn some?
+  {:tag Boolean
+   :added "1.6"
+   :static true}
+  [x] (not (nil? x)))
+
 (def ccm-dir (io/file (.getProperty ^Properties (System/getProperties) "user.home") ".ccm"))
 (def savepoint-dir (io/file ccm-dir "savepoints"))
 (if (not (.exists savepoint-dir)) (.mkdir savepoint-dir))
