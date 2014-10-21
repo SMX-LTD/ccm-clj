@@ -1,10 +1,11 @@
 (ns ccm-clj-test
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [expectations :refer :all]
             [ccm-clj :refer :all]))
 
 (def existing (get-clusters))
-(def current-cluster (active-cluster))
+(def current-cluster (get-active-cluster))
 (def current-keyspace (get-default-keyspace))
 
 (defn tidy-up []
@@ -21,7 +22,7 @@
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
 
-(expect-no-stderr (new! "ccmcljtest1" "2.0.9" 3 20111))
+(expect-no-stderr (new! "ccmcljtest1" "2.1.0" 3 20111))
 
 ;cql as file
 (expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
@@ -31,23 +32,26 @@
 (expect-no-stderr (cql! (io/file "./test/resources/test-data.cql") "ccmclj"))
 
 (expect (set-default-keyspace! "ccmclj"))
-;load string using default keyspace - and trim surplus ; which ccm spews on   ;todo still doesnt work?
-;(expect (cql! "update testtable set data = '22' where id = 2; insert into testtable (id, data) values (3, '2')"));
-;(expect (slurp (io/file "./test/resources/test-data2.table")) (cql! "select * from testtable"))
+;load string using default keyspace - and trim surplus ; which ccm spews on
+(expect (cql! "update testtable set data = '22' where id = 2;insert into testtable (id, data) values (3, '2');")) ;
+
+;test reader
+(expect (str/trim (slurp (io/file "./test/resources/test-data2.table")))
+        (str/trim (:out (cql! (io/reader "./test/resources/test-data2.query")))))
 
 (expect (set ["node1" "node2" "node3"]) (set (:nodes (get-cluster-conf))))
 
-(expect "ccmcljtest1" (active-cluster))
+(expect "ccmcljtest1" (get-active-cluster))
 (expect (conj (set existing) "ccmcljtest1") (set (get-clusters)))
 (expect (cluster? "ccmcljtest1"))
 (expect "ccmclj" (get-default-keyspace))
 
 (expect (not (cluster? "ccmcljtest2")))
 (expect (new! "ccmcljtest2" "2.0.9" 2 20211))
-(expect "ccmcljtest2" (active-cluster))
+(expect "ccmcljtest2" (get-active-cluster))
 (expect (set ["node1" "node2"]) (set (:nodes (get-cluster-conf))))
 (expect (remove! "ccmcljtest2"))
-(expect nil (active-cluster))
+(expect nil (get-active-cluster))
 
 (expect (switch! "ccmcljtest1"))
 (expect (start! "ccmcljtest1"))

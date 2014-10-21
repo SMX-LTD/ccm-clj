@@ -15,17 +15,10 @@
   (log/info "??")
   (apply ccm cmd args))
 
-(defn active-cluster
+(defn get-active-cluster
   "Get name of active cluster"
   []
   (get-active))
-
-(defn get-active-cluster
-  "Deprecated use `(active-cluster)`"
-  {:deprecated "0.1.6"}
-  []
-  (log/warn "Deprecated for `(active-cluster)`")
-  (active-cluster))
 
 (defn cluster?
   "Is `name` found in list of CCM clusters."
@@ -36,7 +29,7 @@
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
   ([keyspace]
    (if (ensure-active)
-     (set-default-keyspace! (active-cluster) keyspace)))
+     (set-default-keyspace! (get-active-cluster) keyspace)))
   ([cluster keyspace]
    (if (cluster? cluster)
      (swap! default-keyspaces assoc cluster keyspace)
@@ -46,7 +39,7 @@
   "Get name of default keyspace of `cluster` or active cluster"
   ([]
    (if (ensure-active)
-     (@default-keyspaces (active-cluster))))
+     (@default-keyspaces (get-active-cluster))))
   ([cluster]
    (@default-keyspaces cluster)))
 
@@ -54,21 +47,21 @@
   "Get a map of the cluster conf"
   ([]
    (if (ensure-active)
-     (get-cluster-conf (active-cluster))))
+     (get-cluster-conf (get-active-cluster))))
   ([name]
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
 (defn get-node-conf
   "Get a map of the conf for the node `name` from active cluster"
   ([name]
-   {:pre (= (active-cluster) nil)}
-   (conf-as-map (io/file ccm-dir (active-cluster) name (str name ".conf")))))
+   {:pre (= (get-active-cluster) nil)}
+   (conf-as-map (io/file ccm-dir (get-active-cluster) name (str name ".conf")))))
 
 (defn start!
   "Start CCM cluster `name`."
   ([]
    (if (ensure-active)
-     (start! (active-cluster))))
+     (start! (get-active-cluster))))
   ([name]
    (let [result (ccm "start")]
      (log/info (str name " cluster started"))
@@ -78,14 +71,15 @@
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
   Note this is a convienent way of loading schemas and seed data, and shouldn't be used in place of a proper CQL client like Alia or Cassaforte."
   ([cmd-source]
-   (cql! cmd-source (@default-keyspaces active-cluster) "" "node1"))
+   (cql! cmd-source (@default-keyspaces (get-active-cluster)) "" "node1"))
   ([cmd-source keyspace]
    (cql! cmd-source keyspace "" "node1"))
   ([cmd-source keyspace log-name]
    (cql! cmd-source keyspace log-name "node1"))
   ([cmd-source keyspace log-name node-name]
    (let [thing cmd-source
-         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) (as-cqlsh-arg thing)))]
+         value (as-cqlsh-arg thing)
+         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) value))]
      (log/info (str log-name "load finished of " (to-str cmd-source) " (check for errors in output)"))
      result)))
 
@@ -106,7 +100,7 @@
   []
   (if (ensure-active)
     (let [result (ccm "stop")]
-      (log/info (str (active-cluster) " cluster stopped"))
+      (log/info (str (get-active-cluster) " cluster stopped"))
       result)
     (log/info "No active cluster to stop")))
 
@@ -114,7 +108,7 @@
   "If `node-name` flush that node on active cluster, else flush all nodes"
   ([]
    (let [result (ccm "flush")]
-     (log/info (str (active-cluster) " node flushed"))
+     (log/info (str (get-active-cluster) " node flushed"))
      result))
   ([node-name]
    (let [result (ccm "flush")]
@@ -187,7 +181,7 @@
   "Is `name` a savepoint of active cluster or `cluster`."
   ([name]
    (if (ensure-active)
-     (savepoint? (active-cluster) name)))
+     (savepoint? (get-active-cluster) name)))
   ([cluster name]
    (.exists (io/file savepoint-dir cluster name))))
 
@@ -195,7 +189,7 @@
   "Create savepoint `name` from `cluster` or active cluster that can be reset to via `rollback!`."
   ([name]
    (if (ensure-active)
-     (savepoint! (active-cluster) name)
+     (savepoint! (get-active-cluster) name)
      false))
   ([cluster name]
    (let [cluster-savepoint-dir (io/file savepoint-dir cluster)]
@@ -208,47 +202,47 @@
          (do (log/info "Created savepoint" name "in cluster" cluster)
              true)
          (do (log/error "Failed to create savepoint" name "in cluster " cluster)
-             (del-dir save-dir true)
+             (del-dir save-dir)
              false))))))
 
 (defn restore!
   "Rollback active cluster or `cluster` to savepoint `name` and start the cluster"
   ([savepoint]
    (if (ensure-active)
-     (restore! (active-cluster) savepoint)))
+     (restore! (get-active-cluster) savepoint)))
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
-     (if (active-cluster) (stop!))
+     (if (get-active-cluster) (stop!))
      (if (sync-dir save-dir cluster-dir)
        (do (log/info "Restored to savepoint" savepoint)
            (start! cluster)
            true)
-       (do (log/error "Failed to rollback to savepoint " savepoint)
+       (do (log/error "Failed to rollback to savepoint" savepoint)
            false)))))
 
 (defn remove-savepoint!
   "Remove `savepoint` from active cluster or `cluster` if supplied"
   ([savepoint]
    (if (ensure-active)
-     (remove-savepoint! (active-cluster) savepoint)))
+     (remove-savepoint! (get-active-cluster) savepoint)))
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)]
      (if (del-dir save-dir)
        (do (log/info "Deleted savepoint" savepoint "in cluster" cluster)
            true)
-       (do (log/error "Failed to deleted savepoint" savepoint "in cluster" cluster)
+       (do (log/error "Failed to delete savepoint" savepoint "in cluster" cluster)
            false)))))
 
 (defn remove-savepoints!
   "Remove all savepoints from active cluster or `cluster` if supplied"
   ([]
    (if (ensure-active)
-     (remove-savepoints! (active-cluster))))
+     (remove-savepoints! (get-active-cluster))))
   ([cluster]
    (let [save-dir (io/file savepoint-dir cluster)]
      (if (del-dir save-dir)
-       (do (log/info "Deleted savepoints for " cluster)
+       (do (log/info "Deleted savepoints for" cluster)
            true)
-       (do (log/error "Failed to deleted savepoints for " cluster)
+       (do (log/error "Failed to deleted savepoints for" cluster)
            false)))))

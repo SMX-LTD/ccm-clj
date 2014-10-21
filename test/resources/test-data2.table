@@ -1,7 +1,8 @@
- smxnz:32 | 20130101 | sid3 | 20130101 | msg-id-1 | null |     null |       null | fred@hotmail.com | null |     null |  subj12
- smxnz:32 | 20130101 | sid6 | 20130101 | msg-id-2 | null |     null |       null |  bob@hotmail.com | null |     null |   subj3
- smxnz:32 | 20140101 | sid4 | 20130101 | msg-id-1 | null |     null |       null | fred@hotmail.com | null |     null |  subj12
- smxnz:33 | 20130201 | sid9 | 20130201 | msg-id-1 | null |     null |       null | fred@hotmail.com | null |     null |   subj1
- smxnz:33 | 20130101 | sid2 | 20130101 | msg-id-3 | null |     null |       null |  bob@hotmail.com | null |     null |   subj1
- smxnz:33 | 20130101 | sid5 | 20130101 | msg-id-1 | null |     null |       null | fred@hotmail.com | null |     null |   subj1
- smxnz:33 | 20130101 | sid7 | 20130101 | msg-id-1 | null |     null |       null | fred@hotmail.com | null |     null |   subj1
+id | data
+----+------
+  1 |    1
+  2 |   22
+  3 |    2
+
+(3 rows)
+
