@@ -16,7 +16,7 @@ Artifacts are released to Clojars. If you are using Maven, add the following rep
 With Leiningen:
 
 ```clojure
-[com.smxemail/ccm-clj "0.1.7"]
+[com.smxemail/ccm-clj "0.2.0"]
 ```
 
 With Maven:
@@ -25,7 +25,7 @@ With Maven:
 <dependency>
   <groupId>com.smxemail</groupId>
   <artifactId>ccm-clj</artifactId>
-  <version>0.1.7</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -81,7 +81,6 @@ done
     (ccm/cql! (io/resource "schema/test-schema.cql") "testkeyspace")
     (ccm/cql! (io/file "./test/resources/test-data.cql") "testkeyspace"))
   (do
-    (ccm/switch! "testcluster")
     (ccm/start! "testcluster")))
 ....
 (ccm/remove! "testcluster")
