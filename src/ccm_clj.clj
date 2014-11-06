@@ -15,7 +15,7 @@
   (log/info "??")
   (apply ccm cmd args))
 
-(defn get-active-cluster
+(defn active-cluster
   "Get name of active cluster"
   []
   (get-active))
@@ -23,74 +23,73 @@
 (defn cluster?
   "Is `name` found in list of CCM clusters."
   [name]
-  (some? (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet)))))
+  (not (nil? (re-matches (re-pattern (str "(?s)" ".*?\\b" name "\\b.*?")) (:out (ccm "list" :quiet))))))
 
 (defn set-default-keyspace!
   "Set default keyspace for `cluster` or the active cluster, persists across cluster switches, clears on remove."
   ([keyspace]
    (if (ensure-active)
-     (set-default-keyspace! (get-active-cluster) keyspace)))
+     (set-default-keyspace! (active-cluster) keyspace)))
   ([cluster keyspace]
    (if (cluster? cluster)
      (swap! default-keyspaces assoc cluster keyspace)
      (log/error "No cluster " cluster " to set default keyspace on"))))
 
-(defn get-default-keyspace
+(defn default-keyspace
   "Get name of default keyspace of `cluster` or active cluster"
   ([]
    (if (ensure-active)
-     (@default-keyspaces (get-active-cluster))))
+     (@default-keyspaces (active-cluster))))
   ([cluster]
    (@default-keyspaces cluster)))
 
-(defn get-cluster-conf
+(defn cluster-conf
   "Get a map of the cluster conf"
   ([]
    (if (ensure-active)
-     (get-cluster-conf (get-active-cluster))))
+     (cluster-conf (active-cluster))))
   ([name]
    (conf-as-map (io/file ccm-dir name "cluster.conf"))))
 
-(defn get-node-conf
+(defn node-conf
   "Get a map of the conf for the node `name` from active cluster"
   ([name]
-   {:pre (= (get-active-cluster) nil)}
-   (conf-as-map (io/file ccm-dir (get-active-cluster) name (str name ".conf")))))
+   {:pre (= (active-cluster) nil)}
+   (conf-as-map (io/file ccm-dir (active-cluster) name (str name ".conf")))))
+
+(defn switch!
+  "Switch active cluster to `name`"
+  [name]
+  (let [result (ccm "switch" name)]
+    (log/info (str "Switched active cluster to " name))
+    result))
 
 (defn start!
   "Start CCM cluster `name`."
   ([]
    (if (ensure-active)
-     (start! (get-active-cluster))))
+     (start! (active-cluster))))
   ([name]
    (let [result (ccm "start")]
-     (log/info (str name " cluster started"))
+     (log/info (str "Cluster " name " started"))
+     (switch! name)
      result)))
 
 (defn cql!
   "Execute cqlsh cmd (against 'node1') in keyspace `keyspace` from cmd-source (can be File, String or URL) into active cluster.
   Note this is a convienent way of loading schemas and seed data, and shouldn't be used in place of a proper CQL client like Alia or Cassaforte."
   ([cmd-source]
-   (cql! cmd-source (@default-keyspaces (get-active-cluster)) "" "node1"))
+   (cql! cmd-source (@default-keyspaces (active-cluster)) "node1"))
   ([cmd-source keyspace]
-   (cql! cmd-source keyspace "" "node1"))
-  ([cmd-source keyspace log-name]
-   (cql! cmd-source keyspace log-name "node1"))
-  ([cmd-source keyspace log-name node-name]
-   (let [thing cmd-source
-         value (as-cqlsh-arg thing)
-         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) value))]
-     (log/info (str log-name "load finished of " (to-str cmd-source) " (check for errors in output)"))
+   (cql! cmd-source keyspace "node1"))
+  ([cmd-source keyspace node-name]
+   (let [arg (as-cqlsh-arg cmd-source)
+         result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) arg))]
+     (log/info (str "Cql loaded: " (to-str cmd-source)))
      result)))
 
-(defn switch!
-  "Switch active cluster to `name`"
-  [name]
-  (let [result (ccm "switch" name)]
-    (log/info (str "Switch active cluster to " name))
-    result))
 
-(defn get-clusters
+(defn clusters
   "Returns a vector of clusters in CCM"
   []
   (vec (re-seq #"[^\n\s*]+" (:out (ccm "list" :quiet)))))
@@ -100,7 +99,7 @@
   []
   (if (ensure-active)
     (let [result (ccm "stop")]
-      (log/info (str (get-active-cluster) " cluster stopped"))
+      (log/info (str (active-cluster) " cluster stopped"))
       result)
     (log/info "No active cluster to stop")))
 
@@ -108,7 +107,7 @@
   "If `node-name` flush that node on active cluster, else flush all nodes"
   ([]
    (let [result (ccm "flush")]
-     (log/info (str (get-active-cluster) " node flushed"))
+     (log/info (str (active-cluster) " node flushed"))
      result))
   ([node-name]
    (let [result (ccm "flush")]
@@ -116,11 +115,14 @@
      result)))
 
 (defn remove!
-  "Remove cluster `name` from CCM including ALL DATA, resetting active cluster if `name`"
+  "Remove cluster `name` from CCM including ALL DATA, resetting active cluster if `name`.
+  If `ccm remove` fails will atttempt to delete .ccm/`name`"
   [name]
-  (let [result (ccm "remove" name)]
+  (let [result (ccm "remove" name)
+        cluster-dir (io/file ccm-dir name)]
+    (if (.exists cluster-dir) (del-dir cluster-dir))
     (swap! default-keyspaces dissoc name)
-    (log/info (str name " cluster removed"))
+    (log/info (str "Cluster " name " removed"))
     result))
 
 (defn add-node!
@@ -154,7 +156,7 @@
   "Create and start cluster.
   `num-nodes` Cassandra nodes will be running using ports inferred from ports-spec
   Those loopbacks may need to be aliased depending on OS.
-  A an optional map `ports-spec` can be used to supply some of :cql :storage :thift :jmx port,
+  A an optional map `ports-spec` can be used to supply :cql and any of :storage :thift :jmx port,
   else ports from cql-port to cql-port + 3 will be used."
   ([name version num-nodes]
    (new! name version num-nodes {}))
@@ -171,17 +173,15 @@
                  :let [ip (str "127.0.0." i)
                        node-name (str "node" i)
                        cql (:cql ports-spec)]]
-           (add-node! node-name ip {:cql cql})
-           (log/info "Added node" node-name "at" ip ":" cql)))
-       (log/info "Found existing cluster at" cluster-dir)))
-   (start! name)
-   (switch! name)))
+           (add-node! node-name ip {:cql cql})))
+       (log/info "Found existing cluster at" cluster-dir))
+     (start! name))))
 
 (defn savepoint?
   "Is `name` a savepoint of active cluster or `cluster`."
   ([name]
    (if (ensure-active)
-     (savepoint? (get-active-cluster) name)))
+     (savepoint? (active-cluster) name)))
   ([cluster name]
    (.exists (io/file savepoint-dir cluster name))))
 
@@ -189,7 +189,7 @@
   "Create savepoint `name` from `cluster` or active cluster that can be reset to via `rollback!`."
   ([name]
    (if (ensure-active)
-     (savepoint! (get-active-cluster) name)
+     (savepoint! (active-cluster) name)
      false))
   ([cluster name]
    (let [cluster-savepoint-dir (io/file savepoint-dir cluster)]
@@ -198,7 +198,7 @@
      (let [save-dir (io/file cluster-savepoint-dir name)
            cluster-dir (io/file ccm-dir cluster)]
        (flush!)
-       (if (copy-dir cluster-dir save-dir)
+       (if (copy-files cluster-dir save-dir)
          (do (log/info "Created savepoint" name "in cluster" cluster)
              true)
          (do (log/error "Failed to create savepoint" name "in cluster " cluster)
@@ -209,12 +209,12 @@
   "Rollback active cluster or `cluster` to savepoint `name` and start the cluster"
   ([savepoint]
    (if (ensure-active)
-     (restore! (get-active-cluster) savepoint)))
+     (restore! (active-cluster) savepoint)))
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
-     (if (get-active-cluster) (stop!))
-     (if (sync-dir save-dir cluster-dir)
+     (if (active-cluster) (stop!))
+     (if (= (:exit (sync-dir save-dir cluster-dir) 0))
        (do (log/info "Restored to savepoint" savepoint)
            (start! cluster)
            true)
@@ -225,7 +225,7 @@
   "Remove `savepoint` from active cluster or `cluster` if supplied"
   ([savepoint]
    (if (ensure-active)
-     (remove-savepoint! (get-active-cluster) savepoint)))
+     (remove-savepoint! (active-cluster) savepoint)))
   ([cluster savepoint]
    (let [save-dir (io/file savepoint-dir cluster savepoint)]
      (if (del-dir save-dir)
@@ -238,7 +238,7 @@
   "Remove all savepoints from active cluster or `cluster` if supplied"
   ([]
    (if (ensure-active)
-     (remove-savepoints! (get-active-cluster))))
+     (remove-savepoints! (active-cluster))))
   ([cluster]
    (let [save-dir (io/file savepoint-dir cluster)]
      (if (del-dir save-dir)
@@ -246,3 +246,33 @@
            true)
        (do (log/error "Failed to deleted savepoints for" cluster)
            false)))))
+
+(defn auto-cluster!
+  "Will either reuse cluster `name` if it has a snapshot created by previous invocation of auto-cluster!,
+  or will create new cluster as per new! and start! and loading of cql files in `keyspace-cql-dir`.
+  That loading will consist of:
+    - files matching (?i).*keyspace.*.cql in (sort) order
+    - the rest of *.cql files in (sort) order
+
+    For example you could have files : my-keyspace.cql, 1_schema, 2_data.cql, 3_data.cql
+    and they would be loaded in that order."
+
+  ([name version num-nodes keyspace-cql-dir]
+   (auto-cluster! name version num-nodes keyspace-cql-dir {}))
+  ([name version num-nodes keyspace-dir ports-spec]
+   (if (savepoint? name "_initial")
+     (do (restore! name "_initial")
+         (do (start!) nil))                                 ; ?
+     (try
+       (if (cluster? name) (remove! name))
+       (new! name version num-nodes ports-spec)
+       (let [files (file-seq (io/file keyspace-dir))
+             keyspace-cql (sort (filter (fn [f] (re-matches #"(?i).*keyspace.*.cql" (.getName f))) files))
+             data-cql (sort (remove #(= % keyspace-cql) (filter (fn [f] (re-matches #"(?i).cql" (.getName f))) files)))]
+         (doseq [k keyspace-cql]
+           (cql! k nil "Keyspace"))
+         (doseq [d data-cql]
+           (cql! d "mailtest" "Data"))
+         (do (savepoint! "_initial")))
+       (catch Throwable t (do (stop!)
+                              (throw t)))))))

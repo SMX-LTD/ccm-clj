@@ -11,14 +11,6 @@
 ;;;;;;;;;;;;;
 ;;; Impl
 
-
-;; I keep using it, so..
-(defn some?
-  {:tag Boolean
-   :added "1.6"
-   :static true}
-  [x] (not (nil? x)))
-
 (def ccm-dir (io/file (.getProperty ^Properties (System/getProperties) "user.home") ".ccm"))
 (def savepoint-dir (io/file ccm-dir "savepoints"))
 (if (not (.exists savepoint-dir)) (.mkdir savepoint-dir))
@@ -55,21 +47,28 @@
 (defn ccm [& cmd]
   (let [[mods cmd*] (filter-mods cmd)
         _ (if-not (or (some mods [:quiet :quiet!]))
-            (log/info (apply str "sh <= ccm " (str/join " " (map name cmd*)))))
+            (log/debug (apply str "sh <= ccm " (str/join " " (map name cmd*)))))
         r (apply sh-exec "ccm" cmd)]
     (if (and (not (:quiet! mods)) (not= (:exit r) 0))
-      (throw (ex-info (str "ccm.<err> => " (str/trim (:err r))) r))
+      (do (log/error (str "ccm.<err> => " (str/trim (:err r))) r) (throw (ex-info "ccm failure" r)))
       r)))
 
 (defn copy-dir
-  "Assumes parents all exist"
+  "Copies from-dir to to-dir. Assumes all parents exist"
   [from-dir to-dir]
-  (sh-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir) :quiet))
+  (try (sh-exec "cp" "-r" (.getAbsolutePath from-dir) (.getAbsolutePath to-dir) :quiet)
+       (catch Exception _ false)))
+
+(defn copy-files
+  "Copies file from-dir to to-dir. Assumes all parents exist"
+  [from-dir to-dir]
+  (try (sh-exec "cp" "-r" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir) :quiet)
+       (catch Exception _ false)))
 
 (defn del-dir
   ([dir]
    (try (sh-exec "rm" "-r" (.getAbsolutePath dir) :quiet)
-        (catch Exception e (throw e)))))
+        (catch Exception _ false))))
 
 (defn sync-dir
   "Assumes parents all exist, syncs contents of `from-dir with `to-dir`"
@@ -115,7 +114,8 @@
   (to-str [_] "For logging convienence"))
 
 (defn string-as-tmp-file [string]
-  (let [tmpFile (File/createTempFile (str (.hashCode string)) nil)]
+  (let [string (str/trim string)
+        tmpFile (File/createTempFile (str (.hashCode string)) nil)]
     (spit tmpFile (if (.endsWith string ";") string (str string ";")))
     tmpFile))
 
@@ -137,5 +137,3 @@
   Reader
   (as-cqlsh-arg [x] (as-cqlsh-arg (slurp x)))
   (to-str [x] "<reader>"))
-
-
