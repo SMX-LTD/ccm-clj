@@ -5,6 +5,9 @@
             [ccm-clj.impl :as impl]
             [ccm-clj :refer :all]))
 
+(set! *warn-on-reflection* true)
+
+
 (def existing (clusters))
 (def current-cluster (active-cluster))
 (def current-keyspace (default-keyspace current-cluster))

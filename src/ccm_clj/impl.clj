@@ -2,11 +2,13 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.java.shell2 :as shell]
+            [clojure.java.classpath :as cp]
             [clojure.tools.logging :as log])
   (:import [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]
            [java.io File Reader StringWriter]
            [java.net URL ServerSocket]
-           [java.util Properties]))
+           [java.util Properties]
+           [java.util.jar JarFile JarEntry]))
 
 ;;;;;;;;;;;;;
 ;;; Impl
@@ -15,7 +17,7 @@
 (def savepoint-dir (io/file ccm-dir "savepoints"))
 (if (not (.exists savepoint-dir)) (.mkdir savepoint-dir))
 
-(defonce default-keyspaces (atom {}))
+(def default-keyspaces (atom {}))
 (def default-base-port 19100)
 (def jmx-increment (atom 100))
 
@@ -73,7 +75,23 @@
 (defn sync-dir
   "Assumes parents all exist, syncs contents of `from-dir with `to-dir`"
   [from-dir to-dir]
-  (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir)))
+  (try (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir))
+       (catch Exception _ false)))
+
+(defn classpath-resources [path]
+  "Returns a seq of files (URLs) at classpath location `path` if it is a dir or returns the file at `path`"
+  (filter identity (mapcat
+                     (fn [j]
+                       (try
+                         (map
+                           (fn [^JarEntry e]
+                             (if (.startsWith (.getName e) path)
+                               (io/resource (.getName e))
+                               nil))
+                           (enumeration-seq (.entries j)))
+                         (catch Exception _ nil)))
+                     (cp/classpath-jarfiles))))
+
 
 (defn get-active []
   (let [current (io/file ccm-dir "CURRENT")]

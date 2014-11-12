@@ -83,11 +83,10 @@
   ([cmd-source keyspace]
    (cql! cmd-source keyspace "node1"))
   ([cmd-source keyspace node-name]
+   (log/info (str "Loading cql: " (to-str cmd-source)))
    (let [arg (as-cqlsh-arg cmd-source)
          result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) arg))]
-     (log/info (str "Cql loaded: " (to-str cmd-source)))
      result)))
-
 
 (defn clusters
   "Returns a vector of clusters in CCM"
@@ -248,8 +247,11 @@
            false)))))
 
 (defn auto-cluster!
-  "Will either reuse cluster `name` if it has a snapshot created by previous invocation of auto-cluster!,
-  or will create new cluster as per new! and start! and loading of cql files in `keyspace-cql-dir`.
+  "Experimental :
+
+  Will either reuse cluster `name` if it has a snapshot created by previous invocation of auto-cluster!,
+  or will create new cluster as per new! and start! and loading of cql files from the classpath resources
+  at each `cql-loc`s.
   That loading will consist of:
     - files matching (?i).*keyspace.*.cql in (sort) order
     - the rest of *.cql files in (sort) order
@@ -257,22 +259,22 @@
     For example you could have files : my-keyspace.cql, 1_schema, 2_data.cql, 3_data.cql
     and they would be loaded in that order."
 
-  ([name version num-nodes keyspace-cql-dir]
-   (auto-cluster! name version num-nodes keyspace-cql-dir {}))
-  ([name version num-nodes keyspace-dir ports-spec]
-   (if (savepoint? name "_initial")
-     (do (restore! name "_initial")
-         (do (start!) nil))                                 ; ?
+  ([name version num-nodes cql-locs]
+   (auto-cluster! name version num-nodes cql-locs {}))
+  ([name version num-nodes cql-locs opts]
+   (if (not (and (savepoint? name "_initial") (restore! name "_initial")))
      (try
        (if (cluster? name) (remove! name))
-       (new! name version num-nodes ports-spec)
-       (let [files (file-seq (io/file keyspace-dir))
-             keyspace-cql (sort (filter (fn [f] (re-matches #"(?i).*keyspace.*.cql" (.getName f))) files))
-             data-cql (sort (remove #(= % keyspace-cql) (filter (fn [f] (re-matches #"(?i).cql" (.getName f))) files)))]
-         (doseq [k keyspace-cql]
-           (cql! k nil "Keyspace"))
-         (doseq [d data-cql]
-           (cql! d "mailtest" "Data"))
-         (do (savepoint! "_initial")))
-       (catch Throwable t (do (stop!)
+       (new! name version num-nodes opts)
+       (doseq [cql-loc (if (seq? cql-locs) cql-locs [cql-locs])]
+         (let [cql-sources (classpath-resources cql-loc)
+               cqls (filter #(re-matches #"(?i).*/*[^/]*.cql" (.getPath %)) cql-sources)
+               {keyspace-cql true data-cql false} (group-by #(re-matches #"(?i).*keyspace.*/*[^/]*.cql" (.getPath %)) cqls)]
+           (doseq [k (sort keyspace-cql)]
+             (cql! k))
+           (doseq [d (sort data-cql)]
+             (cql! d))))
+       (do (savepoint! "_initial"))
+       (catch Throwable t (do (log/error "Error autostarting cluster " name)
+                              (stop!)
                               (throw t)))))))

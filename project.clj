@@ -6,6 +6,7 @@
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [com.climate/java.shell2 "0.1.0"]
+                 [org.clojure/java.classpath "0.2.2"]
                  [org.clojure/tools.logging "0.2.6"]]
   :plugins [[lein-expectations "0.0.8"]]
   :repositories {"sonatype"           {:url       "http://oss.sonatype.org/content/repositories/releases"
