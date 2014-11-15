@@ -8,7 +8,8 @@
            [java.io File Reader StringWriter]
            [java.net URL ServerSocket]
            [java.util Properties]
-           [java.util.jar JarFile JarEntry]))
+           [java.util.jar JarFile JarEntry]
+           [java.util.regex Pattern]))
 
 ;;;;;;;;;;;;;
 ;;; Impl
@@ -48,8 +49,7 @@
 
 (defn ccm [& cmd]
   (let [[mods cmd*] (filter-mods cmd)
-        _ (if-not (or (some mods [:quiet :quiet!]))
-            (log/debug (apply str "sh <= ccm " (str/join " " (map name cmd*)))))
+        _ (log/debug (apply str "sh <= ccm " (str/join " " (map str cmd*))))
         r (apply sh-exec "ccm" cmd)]
     (if (and (not (:quiet! mods)) (not= (:exit r) 0))
       (do (log/error (str "ccm.<err> => " (str/trim (:err r))) r) (throw (ex-info "ccm failure" r)))
@@ -78,20 +78,33 @@
   (try (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir))
        (catch Exception _ false)))
 
-(defn classpath-resources [path]
-  "Returns a seq of files (URLs) at classpath location `path` if it is a dir or returns the file at `path`"
-  (filter identity (mapcat
-                     (fn [j]
-                       (try
-                         (map
-                           (fn [^JarEntry e]
-                             (if (.startsWith (.getName e) path)
-                               (io/resource (.getName e))
-                               nil))
-                           (enumeration-seq (.entries j)))
-                         (catch Exception _ nil)))
-                     (cp/classpath-jarfiles))))
-
+(defn classpath-resources [^Pattern re]
+  "Returns a seq of resources (URLs) from the classpath whose path match `re`"
+  (filter
+    identity
+    (concat (mapcat
+              (fn [j]
+                (try
+                  (map
+                    (fn [^JarEntry e]
+                      (if (re-matches re (.getName e))
+                        (io/resource (.getName e))
+                        nil))
+                    (enumeration-seq (.entries j)))
+                  (catch Exception _ nil)))
+              (cp/classpath-jarfiles))
+            (let [abs-re (re-pattern (str ".*?" (.pattern re)))] ;todo hack, needs to substract dir
+              (mapcat
+                (fn [d]
+                  (try
+                    (let [files (file-seq (io/file d))]
+                      (map
+                        (fn [f]
+                          (if (re-matches abs-re (.getAbsolutePath f))
+                            (io/as-url f)))
+                        files))
+                    (catch Exception _ nil)))
+                (cp/classpath-directories))))))
 
 (defn get-active []
   (let [current (io/file ccm-dir "CURRENT")]
