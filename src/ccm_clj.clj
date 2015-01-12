@@ -1,11 +1,7 @@
 (ns ccm-clj
-  (:require [clojure.string :as str]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [ccm-clj.impl :refer :all]
-            [ccm-clj.impl :as impl])
-  (:import [java.net URL]
-           [java.io File]))
+            [ccm-clj.impl :refer :all]))
 
 ;;;;;;;;;;;;;
 ;;; Public
@@ -126,7 +122,8 @@
     result))
 
 (defn add-node!
-  "Add node `node-name` at next available loopback to active cluster."
+  "Add node `node-name` on `ip` to active cluster. Ports spec must be  a cql port OR map containing :cql port and
+  optionally :jmx :storage and thrift ports mappings."
   ([node-name ip ports-spec]
    (if (and (ensure-active) (not (or ports-spec (:cql ports-spec))))
      (throw (IllegalArgumentException. "Ports spec must be  a cql port OR map containing :cql port")))
@@ -140,7 +137,7 @@
      (swap! jmx-increment + 10)
      (ccm "add"
           "-r" "0"
-          "-j" (str jmx)                                    ;NO IP!
+          "-j" (str jmx)                                    ;NO IP binds all interfaces !
           "-l" (str ip ":" storage)
           "-t" (str ip ":" thrift)
           (str "--binary-itf=" (str ip ":" cql))
@@ -252,7 +249,7 @@
 
   Will either reuse cluster `name` if it has a snapshot created by previous invocation of auto-cluster!,
   or will create new cluster as per new! and start! and loading of cql files from the classpath resources
-  as per `keyspace->clq-re`, a map of keyspame to regular expression(s) matching the files to load against
+  as per `keyspace->clq-re`, a map of keyspame to regular expressions matching the files to load against
   that keyspace from those on the classpath. The files will be loaded in name order generally but with priority
   given to files containing the word \"keyspace\".
 
@@ -277,10 +274,8 @@
                _ (if (empty? cqls) (log/warn "No sources matching" cql-res "found on classpath") (log/info "Found cql:" cqls))
                {keyspace-cql true data-cql false} (group-by #(some? (re-matches #"(?i).*keyspace[^/]*.cql" (.getFile %))) cqls)]
            (doseq [k (sort-by #(.getFile %) keyspace-cql)]
-             (log/error k)
              (cql! k))
            (doseq [d (sort-by #(.getFile %) data-cql)]
-             (log/error d)
              (cql! d keyspace))))
        (do (savepoint! "_initial"))
        (catch Throwable t (do (log/error "Error autostarting cluster " name)

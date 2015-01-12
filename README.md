@@ -68,6 +68,16 @@ done
 
 ## Usage
 
+One line setup with  `auto-cluster`, args: name, version, number-of-nodes, map-of-keyspace-to-cql-re-paths
+
+```clojure
+(ccm/auto-cluster! "test-cluster" "2.0.10" 3
+                      {"my-keyspace" [#"schema/test-keyspace.cql" #"schema/test-schema.cql"  #"test-data/.*\.cql"]})
+
+```
+
+Or full fine-grained control:
+
 ```clojure
 
 (ns some-cas-test
@@ -79,7 +89,8 @@ done
     (ccm/new! "testcluster" cass-version num-nodes cql-port)
     (ccm/cql! (io/file "./test/resources/test-keyspace.cql"))
     (ccm/cql! (io/resource "schema/test-schema.cql") "testkeyspace")
-    (ccm/cql! (io/file "./test/resources/test-data.cql") "testkeyspace"))
+    (ccm/cql! (io/file "./test/resources/test-data1.cql") "testkeyspace")
+    (ccm/cql! (io/file "./test/resources/test-data2.cql") "testkeyspace"))
   (do
     (ccm/start! "testcluster")))
 ....

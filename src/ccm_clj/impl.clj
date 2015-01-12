@@ -4,11 +4,10 @@
             [clojure.java.shell2 :as shell]
             [clojure.java.classpath :as cp]
             [clojure.tools.logging :as log])
-  (:import [java.util.concurrent ScheduledThreadPoolExecutor TimeUnit]
-           [java.io File Reader StringWriter]
-           [java.net URL ServerSocket]
+  (:import [java.io File Reader]
+           [java.net URL]
            [java.util Properties]
-           [java.util.jar JarFile JarEntry]
+           [java.util.jar JarEntry]
            [java.util.regex Pattern]))
 
 ;;;;;;;;;;;;;
@@ -19,7 +18,7 @@
 (if (not (.exists savepoint-dir)) (.mkdir savepoint-dir))
 
 (def default-keyspaces (atom {}))
-(def default-base-port 19100)
+(def default-base-port 19142)
 (def jmx-increment (atom 100))
 
 (defn filter-mods [cmd*]
