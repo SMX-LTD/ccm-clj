@@ -67,9 +67,9 @@
    (if (ensure-active)
      (start! (active-cluster))))
   ([name]
+   (switch! name)
    (let [result (ccm "start")]
      (log/info (str "Cluster " name " started"))
-     (switch! name)
      result)))
 
 (defn cql!
