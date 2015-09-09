@@ -18,7 +18,7 @@ Artifacts are released to Clojars. If you are using Maven, add the following rep
 With Leiningen:
 
 ```clojure
-[com.smxemail/ccm-clj "0.2.1"]
+[com.smxemail/ccm-clj "1.0.0"]
 ```
 
 With Maven:
@@ -27,7 +27,7 @@ With Maven:
 <dependency>
   <groupId>com.smxemail</groupId>
   <artifactId>ccm-clj</artifactId>
-  <version>0.2.1</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
