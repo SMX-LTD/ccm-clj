@@ -6,7 +6,10 @@ As a JVM library, it is however easily used with other languages [http://clojure
 
 ## Current Version
 
+**Note: breaking change with 1.0. The ns moved from ccm-clj to ccm-clj.core for better Java integration (no longer using empty package).**
+
 Artifacts are released to Clojars. If you are using Maven, add the following repository definition to your pom.xml:
+
 
 ```xml
 <repository>
