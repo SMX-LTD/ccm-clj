@@ -1,4 +1,4 @@
-(ns ccm-clj
+(ns core
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [ccm-clj.impl :refer :all]))
@@ -9,7 +9,6 @@
 (defn exec!
   "Execute ccm `cmd`, returns {:err <stderr messages>, :out <stdout messages>, :exit <return code>}"
   [cmd & args]
-  (log/info "??")
   (apply ccm cmd args))
 
 (defn active-cluster
@@ -67,9 +66,9 @@
    (if (ensure-active)
      (start! (active-cluster))))
   ([name]
+   (switch! name)
    (let [result (ccm "start")]
      (log/info (str "Cluster " name " started"))
-     (switch! name)
      result)))
 
 (defn cql!
@@ -164,7 +163,7 @@
          cluster-dir (io/file ccm-dir name)]
      (if (not (cluster? name))
        (do
-         (log/info "Creating new cluster" name "listening on" (:cql ports-spec))
+         (log/info "Creating new cluster" name "(this may take a while), listening on" (:cql ports-spec))
          (ccm "create" name "-v" (str version))
          (doseq [i (range 1 (inc num-nodes))
                  :let [ip (str "127.0.0." i)
@@ -247,8 +246,8 @@
 (defn auto-cluster!
   "Experimental :
 
-  Will either reuse cluster `name` if it has a snapshot created by previous invocation of auto-cluster!,
-  or will create new cluster as per new! and start! and loading of cql files from the classpath resources
+  Will either reuse cluster `name` if it has a savepoint _initial created by previous invocation of auto-cluster!,
+  or will create new cluster as per new! and start! and gg of cql files from the classpath resources
   as per `keyspace->clq-re`, a map of keyspame to regular expressions matching the files to load against
   that keyspace from those on the classpath. The files will be loaded in name order generally but with priority
   given to files containing the word \"keyspace\".
@@ -270,7 +269,7 @@
        (doseq [keyspace (keys keyspace->cql-re)
                cql-res (keyspace->cql-re keyspace)
                :let [cql-res (if (sequential? cql-res) cql-res [cql-res])]]
-         (let [cqls (mapcat classpath-resources cql-res)
+         (let [cqls (mapcat #(str (classpath-resources %)) cql-res)
                _ (if (empty? cqls) (log/warn "No sources matching" cql-res "found on classpath") (log/info "Found cql:" cqls))
                {keyspace-cql true data-cql false} (group-by #(some? (re-matches #"(?i).*keyspace[^/]*.cql" (.getFile %))) cqls)]
            (doseq [k (sort-by #(.getFile %) keyspace-cql)]
@@ -278,6 +277,6 @@
            (doseq [d (sort-by #(.getFile %) data-cql)]
              (cql! d keyspace))))
        (do (savepoint! "_initial"))
-       (catch Throwable t (do (log/error "Error autostarting cluster " name)
+       (catch Throwable t (do (log/error "Error starting cluster " name)
                               (if (active-cluster) (stop!))
                               (throw t)))))))

@@ -1,9 +1,8 @@
-(ns ccm-clj-test
+(ns ccm_clj.core-test
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [expectations :refer :all]
-            [ccm-clj.impl :as impl]
-            [ccm-clj :refer :all]))
+            [ccm-clj.core :refer :all]))
 
 (set! *warn-on-reflection* true)
 
@@ -12,24 +11,23 @@
 (def current-cluster (active-cluster))
 (def current-keyspace (default-keyspace current-cluster))
 
-(defn tidy-up {:expectations-options :before-run} []
-  (if current-cluster (stop!))
-  (ccm-clj/remove! "ccmcljtest1")
-  (ccm-clj/remove! "ccmcljtest2"))
+(defn tidy-up-pre {:expectations-options :before-run} []
+  (if current-cluster (stop!)))
 
-(defn tidy-up {:expectations-options :after-run} []
+(defn tidy-up-post {:expectations-options :after-run} []
   (if current-cluster (stop!))
-  (if (cluster? "ccmcljtest1") (ccm-clj/remove! "ccmcljtest1"))
-  (if (cluster? "ccmcljtest2") (ccm-clj/remove! "ccmcljtest2"))
+  (if (cluster? "ccmcljtest1") (remove! "ccmcljtest1"))
+  (if (cluster? "ccmcljtest2") (remove! "ccmcljtest2"))
   (if current-keyspace (set-default-keyspace! current-keyspace))
   (remove-savepoints! "ccmcljtest1")
   (remove-savepoints! "ccmcljtest2")
+  (remove-savepoints! "ccmcljauto")
   (if (and current-cluster (cluster? current-cluster)) (switch! current-cluster)))
 
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
 
-(expect-no-stderr (new! "ccmcljtest1" "2.1.0" 3 20111))
+(expect-no-stderr (new! "ccmcljtest1" "2.1.8" 3 20111))
 
 ;cql as file
 (expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
@@ -87,3 +85,12 @@
 (expect (remove-savepoints!))
 (expect false (savepoint? "testsave1"))
 (expect false (savepoint? "ccmcljtest1" "testsave2"))
+
+(stop!)
+;check load order
+(expect ["11" "112" "1A" "1_2" "2" "21a" "21ba" "222aa" "5" "A21" "Aa"]
+        (sort-by (numeric-alpha-keyfn 5) ["Aa" "222aa" "21a" "21ba" "11" "1_2" "A21" "1A" "112" "5" "2"]))
+(expect-no-stderr (auto-cluster! "ccmcljauto" "2.1.0" 3 {"ccmclj"
+                                                         [#"test-data\.cql"
+                                                          #"test-keyspace\.cql"]}))
+(expect (hash-set "node1" "node2" "node3") (set (:nodes (cluster-conf))))
