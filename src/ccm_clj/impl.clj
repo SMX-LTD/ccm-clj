@@ -77,33 +77,25 @@
   (try (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir))
        (catch Exception _ false)))
 
-(defn classpath-resources [^Pattern re]
-  "Returns a seq of resources (URLs) from the classpath whose path match `re`"
+(defn classpath-resources [re-s]
+  "Returns a seq of resources (URLs) from the classpath whose path match any of `re-s`"
   (filter
-    identity
-    (concat (mapcat
-              (fn [j]
-                (try
-                  (map
-                    (fn [^JarEntry e]
-                      (if (re-matches re (.getName e))
-                        (io/resource (.getName e))
-                        nil))
-                    (enumeration-seq (.entries j)))
-                  (catch Exception _ nil)))
-              (cp/classpath-jarfiles))
-            (let [abs-re (re-pattern (str ".*?" (.pattern re)))] ;todo hack, needs to substract dir
-              (mapcat
-                (fn [d]
-                  (try
-                    (let [files (file-seq (io/file d))]
-                      (map
-                        (fn [f]
-                          (if (re-matches abs-re (.getAbsolutePath f))
-                            (io/as-url f)))
-                        files))
-                    (catch Exception _ nil)))
-                (cp/classpath-directories))))))
+    some?
+    (concat
+      (map
+        (fn [^JarEntry e]
+          (if (some #(re-matches % (.getName e)) re-s)
+            (io/resource (.getName e))))
+        (mapcat #(enumeration-seq (.entries %)) (cp/classpath-jarfiles)))
+      (map
+        (fn [^File f]
+          (some
+            (fn [re]
+              (let [abs-re (re-pattern (str ".*?" (.pattern re)))] ;todo hack, needs to subtract dir
+                (if (re-matches abs-re (.getAbsolutePath f))
+                  (io/as-url f))))
+            re-s))
+        (mapcat #(.listFiles (io/file %)) (cp/classpath-directories))))))
 
 (defn get-active []
   (let [current (io/file ccm-dir "CURRENT")]
@@ -120,8 +112,8 @@
 
 (defn conf-as-map [conf-file]
   ;todo this is pretty suss
-  ;Python config parsers do not guess datatypes of values in configuration files, always storing them internally as string,
-  ;BUT we'll keyword cos we can't help ourselves."
+  ;"Python config parsers do not guess datatypes of values in configuration files, always storing them internally as string"
+  ;BUT we'll keyword cos we can't help ourselves.
   {:pre (true? (and (not (nil? conf-file)) (.exists conf-file)))}
   (apply array-map (mapcat
                      (fn [line]
@@ -146,6 +138,7 @@
 (defn string-as-tmp-file [string]
   (let [string (str/trim string)
         tmpFile (File/createTempFile (str (.hashCode string)) nil)]
+    (.deleteOnExit tmpFile)
     (spit tmpFile (if (.endsWith string ";") string (str string ";")))
     tmpFile))
 
@@ -166,4 +159,4 @@
   (to-str [x] (subs x 0 (min (.length x) 100)))
   Reader
   (as-cqlsh-arg [x] (as-cqlsh-arg (slurp x)))
-  (to-str [x] "<reader>"))
+  (to-str [x] "<from reader...>"))

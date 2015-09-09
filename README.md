@@ -1,6 +1,8 @@
 # CCM-clj
 
-A Clojure (1.5+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests.
+A Clojure (1.6+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests and creating arbitrary Cassandra Clusters.
+CCM-clj is courtesy of SMX (http://smxemail.com) where we have been using it for a couple of years to simplify development with Cassandra and Clojure.
+As a JVM library, it is easily used with other languages.
 
 ## Current Version
 
@@ -31,7 +33,11 @@ With Maven:
 
 ### CCM installation
 
-See Requirements and Installation at https://github.com/pcmanus/ccm
+On OSX:
+```bash
+brew install ccm
+```
+Otherwise see Requirements and Installation at https://github.com/pcmanus/ccm x`
 
 Note that local loopback aliasing may be required on OSX.
 I have /Library/LaunchDaemons/moreloopbacks.plist:
@@ -68,19 +74,18 @@ done
 
 ## Usage
 
-One line setup with  `auto-cluster`, args: name, version, number-of-nodes, map-of-keyspace-to-cql-re-paths
+One line test cluster setup with  `auto-cluster!`, args: name, version, number-of-nodes, map-of-keyspace-to-cql-re-paths
 
 ```clojure
 (ccm/auto-cluster! "test-cluster" "2.0.10" 3
-                      {"my-keyspace" [#"schema/test-keyspace.cql" #"schema/test-schema.cql"  #"test-data/.*\.cql"]})
+                      {"my-keyspace" [#"test.*.cql"]})
 
 ```
 
-Or full fine-grained control:
+Or for full fine-grained control:
 
 ```clojure
-
-(ns some-cas-test
+(ns some-cassandra-test
   (:require [ccm-clj :as ccm]
             [clojure.java.io :as io]))
 
@@ -97,9 +102,18 @@ Or full fine-grained control:
 (ccm/remove! "testcluster")
 ```
 
+## Savepoints (New to 1.0):
+
+```clojure
+(cql! "insert into testtable (id, data) values (99, 'tosurvive');")
+(savepoint! "testsavepoint"))
+(cql! "insert into testtable (id, data) values (100, 'torollback');")
+(restore! "testsavepoint"))
+```
+
 ## Notes
 
-- This is NOT A CQL CLIENT it's for test cluster setup. Instead, use [`Alia`](https://github.com/mpenet/alia) or [`Cassaforte`](https://github.com/clojurewerkz/cassaforte).
+- This is NOT a CQL library it's for test cluster setup. Instead, use [`Alia`](https://github.com/mpenet/alia) or [`Cassaforte`](https://github.com/clojurewerkz/cassaforte).
 - Similarly I don't intend to shadow every CCM function only to provide a useful integration API.
 - I test new releases on the current CCM, so you should upgrade CCM-clj and CCM at the same time.
 - Probably doesn't work on Windows. Patches welcome.
@@ -123,7 +137,7 @@ Colin Taylor at gmail.
 
 ## License
 
-Copyright © 2014 SMX Ltd (http://smxemail.com) and Contributors.
+Copyright © 2015 SMX Ltd (http://smxemail.com) and Contributors.
 
 Distributed under the Eclipse Public License.
 

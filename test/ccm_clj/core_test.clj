@@ -1,4 +1,4 @@
-(ns ccm_clj.core-test
+(ns ccm-clj.core-test
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [expectations :refer :all]
@@ -27,7 +27,7 @@
 (defmacro expect-no-stderr [body]
   `(expect "" (:err (~@body))))
 
-(expect-no-stderr (new! "ccmcljtest1" "2.1.8" 3 20111))
+(expect-no-stderr (new! "ccmcljtest1" "2.1.9" 3 20111))
 
 ;cql as file
 (expect-no-stderr (cql! (io/file "./test/resources/test-keyspace.cql")))
@@ -52,7 +52,7 @@
 (expect "ccmclj" (default-keyspace))
 
 (expect (not (cluster? "ccmcljtest2")))
-(expect (new! "ccmcljtest2" "2.0.9" 2 20211))
+(expect (new! "ccmcljtest2" "2.1.9" 2 20511))
 (expect "ccmcljtest2" (active-cluster))
 (expect (set ["node1" "node2"]) (set (:nodes (cluster-conf))))
 (expect (remove! "ccmcljtest2"))
@@ -90,7 +90,7 @@
 ;check load order
 (expect ["11" "112" "1A" "1_2" "2" "21a" "21ba" "222aa" "5" "A21" "Aa"]
         (sort-by (numeric-alpha-keyfn 5) ["Aa" "222aa" "21a" "21ba" "11" "1_2" "A21" "1A" "112" "5" "2"]))
-(expect-no-stderr (auto-cluster! "ccmcljauto" "2.1.0" 3 {"ccmclj"
-                                                         [#"test-data\.cql"
-                                                          #"test-keyspace\.cql"]}))
-(expect (hash-set "node1" "node2" "node3") (set (:nodes (cluster-conf))))
+
+(expect "ccmcljauto"
+        (do (auto-cluster! "ccmcljauto" "2.1.9" 3 {"ccmclj" [#"test-.*\.cql"]})
+            (active-cluster)))

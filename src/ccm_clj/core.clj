@@ -1,7 +1,8 @@
-(ns core
+(ns ccm-clj.core
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [ccm-clj.impl :refer :all]))
+            [ccm-clj.impl :refer :all]
+            [clojure.string :as str]))
 
 ;;;;;;;;;;;;;
 ;;; Public
@@ -170,7 +171,7 @@
                        node-name (str "node" i)
                        cql (:cql ports-spec)]]
            (add-node! node-name ip {:cql cql})))
-       (log/info "Found existing cluster at" cluster-dir))
+       (log/info "Found existing cluster at" (.getAbsolutePath cluster-dir)))
      (start! name))))
 
 (defn savepoint?
@@ -243,18 +244,26 @@
        (do (log/error "Failed to deleted savepoints for" cluster)
            false)))))
 
+(defn numeric-alpha-keyfn [max-len]
+  (fn [k]
+    (let [k-str (str k)
+          k-len (count k-str)]
+      (vec (for [i (range max-len)]
+             (if (< i k-len)
+               (long (.charAt k-str i))
+               0))))))
+
 (defn auto-cluster!
   "Experimental :
 
-  Will either reuse cluster `name` if it has a savepoint _initial created by previous invocation of auto-cluster!,
-  or will create new cluster as per new! and start! and gg of cql files from the classpath resources
-  as per `keyspace->clq-re`, a map of keyspame to regular expressions matching the files to load against
-  that keyspace from those on the classpath. The files will be loaded in name order generally but with priority
-  given to files containing the word \"keyspace\".
+  Will  create new cluster as per new! and start! and the loading of cql files from the classpath resources
+  as per `keyspace->clq-re`, a map of keyspace to regular expressions matching the files to load against
+  that keyspace from those on the classpath. The files will be loaded in numeric-alpha (1-b, 2-a, 11-a, a, b1, b12, b2) order generally but with priority
+  given to files containing the word \"keyspace\" then files containing the word \"schema\".
 
   For example:
    {\"testkeyspace\": #\"schema/.*.cql\"}  would match the contents of the path ./schema
-    my-keyspace.cql, 1_schema.cql, 2_data.cql, 3_data.cql
+    my-keyspace.cql, 1_schema.cql, 1_data.cql, 2_data.cql
     and they would be loaded in that order.
 
     {\"testkeyspace\": [#\"keyspace/.*.cql\", #\"schema/.*.cql\", #\"data/.*.cql\"]} would have the same effect."
@@ -262,21 +271,30 @@
   ([name version num-nodes keyspace->cql-re]
    (auto-cluster! name version num-nodes keyspace->cql-re {}))
   ([name version num-nodes keyspace->cql-re opts]
-   (if (not (and (savepoint? name "_initial") (restore! name "_initial")))
-     (try
-       (if (cluster? name) (remove! name))
-       (new! name version num-nodes opts)
-       (doseq [keyspace (keys keyspace->cql-re)
-               cql-res (keyspace->cql-re keyspace)
-               :let [cql-res (if (sequential? cql-res) cql-res [cql-res])]]
-         (let [cqls (mapcat #(str (classpath-resources %)) cql-res)
-               _ (if (empty? cqls) (log/warn "No sources matching" cql-res "found on classpath") (log/info "Found cql:" cqls))
-               {keyspace-cql true data-cql false} (group-by #(some? (re-matches #"(?i).*keyspace[^/]*.cql" (.getFile %))) cqls)]
-           (doseq [k (sort-by #(.getFile %) keyspace-cql)]
-             (cql! k))
-           (doseq [d (sort-by #(.getFile %) data-cql)]
-             (cql! d keyspace))))
-       (do (savepoint! "_initial"))
-       (catch Throwable t (do (log/error "Error starting cluster " name)
-                              (if (active-cluster) (stop!))
-                              (throw t)))))))
+   (try
+     (if (cluster? name) (remove! name))
+     (new! name version num-nodes opts)
+     (doseq [keyspace (keys keyspace->cql-re)
+             :let [cql-res (keyspace->cql-re keyspace)]]
+       (let [urls (classpath-resources cql-res)
+             max-len (apply max (map #(count (str %)) urls))
+             urls (sort-by (numeric-alpha-keyfn max-len) urls)
+             {:keys [keyspace-urls schema-urls data-urls]} (if (seq urls)
+                                                             (group-by (fn [u]
+                                                                         (let [rn (str/lower-case (str u))]
+                                                                           (cond
+                                                                             (.contains rn "keyspace") :keyspace-urls
+                                                                             (.contains rn "schema") :schema-urls
+                                                                             :else :data-urls))) urls))]
+         (if (and keyspace-urls (empty? keyspace-urls) (empty? schema-urls) (empty? data-urls))
+           (log/warn "No sources for keyspace" keyspace "found on classpath"))
+         (doseq [cql keyspace-urls]
+           (cql! cql))
+         (doseq [cql schema-urls]
+           (cql! cql keyspace))
+         (doseq [cql data-urls]
+           (cql! cql keyspace))))
+      (switch! name)
+     (catch Throwable t (do (log/error "Error starting cluster" name)
+                            (if (active-cluster) (stop!))
+                            (throw t))))))
