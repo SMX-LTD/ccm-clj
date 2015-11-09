@@ -21,7 +21,7 @@ Artifacts are released to Clojars. If you are using Maven, add the following rep
 With Leiningen:
 
 ```clojure
-[com.smxemail/ccm-clj "1.0.0"]
+[com.smxemail/ccm-clj "1.1.0"]
 ```
 
 With Maven:
@@ -30,7 +30,7 @@ With Maven:
 <dependency>
   <groupId>com.smxemail</groupId>
   <artifactId>ccm-clj</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
 </dependency>
 ```
 
@@ -80,8 +80,8 @@ done
 One line test cluster setup with  `auto-cluster!`, args: name, version, number-of-nodes, map-of-keyspace-to-cql-re-paths
 
 ```clojure
-(ccm/auto-cluster! "test-cluster" "2.0.10" 3
-                      {"my-keyspace" [#"test.*.cql"]})
+(ccm/auto-cluster! "test-cluster" "2.0.14" 3 ["schema/test-keyspace.cql"
+                      {"my-keyspace" [#"schema/test.*schema.cql" #"schema/test.*data.cql"]})
 
 ```
 
