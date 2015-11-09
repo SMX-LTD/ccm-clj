@@ -30,11 +30,11 @@
   (let [[mods cmd*] (filter-mods cmd)
         ;remove lein? prop from env that inteferes with ant
         cmd* (concat cmd* [:env (-> (into {} (System/getenv)) (dissoc "classpath" "CLASSPATH"))])
-        r (apply shell/sh cmd*)
-        r (-> r
-              (assoc :cmd (butlast (butlast cmd*)))         ;remove env from logging
-              (assoc :out (str/trim (.replace (:out r) "\\\\" "\\")))
-              (assoc :err (str/trim (.replace (:err r) "\\\\" "\\"))))
+        r    (apply shell/sh cmd*)
+        r    (-> r
+               (assoc :cmd (butlast (butlast cmd*)))        ;remove env from logging
+               (assoc :out (str/trim (.replace (:out r) "\\\\" "\\")))
+               (assoc :err (str/trim (.replace (:err r) "\\\\" "\\"))))
         exit (:exit r)]
     (when-not (or (:quiet! mods) (= exit 0))
       (if (:warn-only mods)
@@ -77,25 +77,52 @@
   (try (sh-exec "rsync" "-avq" "--delete" (str (.getAbsolutePath from-dir) "/") (.getAbsolutePath to-dir))
        (catch Exception _ false)))
 
-(defn classpath-resources [re-s]
-  "Returns a seq of resources (URLs) from the classpath whose path match any of `re-s`"
-  (filter
-    some?
-    (concat
-      (map
-        (fn [^JarEntry e]
-          (if (some #(re-matches % (.getName e)) re-s)
-            (io/resource (.getName e))))
-        (mapcat #(enumeration-seq (.entries %)) (cp/classpath-jarfiles)))
-      (map
-        (fn [^File f]
-          (some
-            (fn [re]
-              (let [abs-re (re-pattern (str ".*?" (.pattern re)))] ;todo hack, needs to subtract dir
-                (if (re-matches abs-re (.getAbsolutePath f))
+(defn get-files [dir]
+  (remove #(.isDirectory %) (file-seq dir)))
+
+(defn classpath-resources []
+  "Returns a seq of resources (URLs) from the classpath - no classes"
+  (let [skip #{".class" ".clj" ".cljs" ".cljc" ".js" ".html"}]
+    (distinct
+      (filter
+        some?
+        (concat
+          (map
+            (fn [^JarEntry e]
+              (let [file-type (subs (.getName e) (max 0 (.lastIndexOf (.getName e) ".")))]
+                (if (not (contains? skip file-type))
+                  (io/resource (.getName e)))))
+            (mapcat #(enumeration-seq (.entries %)) (cp/classpath-jarfiles)))
+          (map
+            (fn [^File f]
+              (let [file-type (subs (.getName f) (max 0 (.lastIndexOf (.getName f) ".")))]
+                (if (not (contains? skip file-type))
                   (io/as-url f))))
-            re-s))
-        (mapcat #(.listFiles (io/file %)) (cp/classpath-directories))))))
+            (mapcat #(get-files %) (cp/classpath-directories))))))))
+
+(defn numeric-alpha-keyfn [max-len]
+  (fn [k]
+    (let [k-str (str k)
+          k-len (count k-str)]
+      (vec (for [i (range max-len)]
+             (if (< i k-len)
+               (long (.charAt k-str i))
+               0))))))
+
+(defn expand-cqls [resources cqls]
+  (reduce
+    (fn [expanded cql-hint]
+      (if (= Pattern (type cql-hint))
+        (let [urls    (filter #(re-find cql-hint (str %)) resources)
+              max-len (if (seq urls) (apply max (map #(count (str %)) urls)))
+              urls    (remove nil? (sort-by (numeric-alpha-keyfn max-len) urls))]
+          (if (seq urls)
+            (into expanded urls)
+            expanded))
+        (let [cql (if (not= URL (type cql-hint)) cql-hint (io/resource cql-hint))]
+          (if cql expanded (conj expanded cql)))))
+    []
+    cqls))
 
 (defn get-active []
   (let [current (io/file ccm-dir "CURRENT")]
@@ -120,13 +147,13 @@
                        (let [k (subs line 0 (inc (.indexOf line ":")))
                              v (subs line (inc (.indexOf line ":")))] ;todo comments multi-lines
                          (letfn [(realize [i]
-                                          (let [i (str/trim i)]
-                                            (cond
-                                              (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
-                                              (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))
-                                              (.endsWith i ":") (keyword (subs i 0 (dec (.length i))))
-                                              (= i "null") nil
-                                              :else i)))]
+                                   (let [i (str/trim i)]
+                                     (cond
+                                       (.startsWith i "[") (-> (vec (map realize (re-seq #"[^\[\],]+" i))))
+                                       (.startsWith i "{") (-> (apply array-map (map realize (re-seq #"[^\{\},:]+" i))))
+                                       (.endsWith i ":") (keyword (subs i 0 (dec (.length i))))
+                                       (= i "null") nil
+                                       :else i)))]
                            [(realize k) (realize v)])))
                      (re-seq #"[^\n]+" (slurp conf-file)))))
 
@@ -136,7 +163,7 @@
   (to-str [_] "For logging convienence"))
 
 (defn string-as-tmp-file [string]
-  (let [string (str/trim string)
+  (let [string  (str/trim string)
         tmpFile (File/createTempFile (str (.hashCode string)) nil)]
     (.deleteOnExit tmpFile)
     (spit tmpFile (if (.endsWith string ";") string (str string ";")))

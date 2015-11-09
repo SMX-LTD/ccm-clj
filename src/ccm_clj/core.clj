@@ -2,7 +2,9 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [ccm-clj.impl :refer :all]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.java.classpath :as cp])
+  (:import [java.util.regex Pattern]))
 
 ;;;;;;;;;;;;;
 ;;; Public
@@ -81,7 +83,7 @@
    (cql! cmd-source keyspace "node1"))
   ([cmd-source keyspace node-name]
    (log/info (str "Loading cql: " (to-str cmd-source)))
-   (let [arg (as-cqlsh-arg cmd-source)
+   (let [arg    (as-cqlsh-arg cmd-source)
          result (apply ccm (concat (if keyspace [node-name "cqlsh" "-k" keyspace] [node-name "cqlsh"]) arg))]
      result)))
 
@@ -114,11 +116,12 @@
   "Remove cluster `name` from CCM including ALL DATA, resetting active cluster if `name`.
   If `ccm remove` fails will atttempt to delete .ccm/`name`"
   [name]
-  (let [result (ccm "remove" name)
+  (let [result      (ccm "remove" name)
         cluster-dir (io/file ccm-dir name)]
-    (if (.exists cluster-dir) (del-dir cluster-dir))
+    (when (.exists cluster-dir)
+      (del-dir cluster-dir)
+      (log/info (str "Cluster " name " removed")))
     (swap! default-keyspaces dissoc name)
-    (log/info (str "Cluster " name " removed"))
     result))
 
 (defn add-node!
@@ -129,19 +132,19 @@
      (throw (IllegalArgumentException. "Ports spec must be  a cql port OR map containing :cql port")))
 
    (let [ports-spec (if-not (map? ports-spec) {:cql ports-spec} ports-spec)
-         cql (:cql ports-spec)
+         cql        (:cql ports-spec)
          {:keys [storage thrift jmx]
           :or   {storage (+ 1 cql)
                  thrift  (+ 2 cql)
                  jmx     (+ @jmx-increment cql)}} ports-spec]
      (swap! jmx-increment + 10)
      (ccm "add"
-          "-r" "0"
-          "-j" (str jmx)                                    ;NO IP binds all interfaces !
-          "-l" (str ip ":" storage)
-          "-t" (str ip ":" thrift)
-          (str "--binary-itf=" (str ip ":" cql))
-          node-name)
+       "-r" "0"
+       "-j" (str jmx)                                       ;NO IP binds all interfaces !
+       "-l" (str ip ":" storage)
+       "-t" (str ip ":" thrift)
+       (str "--binary-itf=" (str ip ":" cql))
+       node-name)
      (log/info "Added node" node-name "@" (str ip ":" cql)))))
 
 (defn remove-node! [node-name]
@@ -158,18 +161,18 @@
   ([name version num-nodes]
    (new! name version num-nodes {}))
   ([name version num-nodes ports-spec]
-   (let [ports-spec (merge
-                      {:cql default-base-port}
-                      (if (map? ports-spec) ports-spec {:cql ports-spec}))
+   (let [ports-spec  (merge
+                       {:cql default-base-port}
+                       (if (map? ports-spec) ports-spec {:cql ports-spec}))
          cluster-dir (io/file ccm-dir name)]
      (if (not (cluster? name))
        (do
          (log/info "Creating new cluster" name "(this may take a while), listening on" (:cql ports-spec))
          (ccm "create" name "-v" (str version))
          (doseq [i (range 1 (inc num-nodes))
-                 :let [ip (str "127.0.0." i)
+                 :let [ip        (str "127.0.0." i)
                        node-name (str "node" i)
-                       cql (:cql ports-spec)]]
+                       cql       (:cql ports-spec)]]
            (add-node! node-name ip {:cql cql})))
        (log/info "Found existing cluster at" (.getAbsolutePath cluster-dir)))
      (start! name))))
@@ -192,7 +195,7 @@
    (let [cluster-savepoint-dir (io/file savepoint-dir cluster)]
      (if-not (.exists cluster-savepoint-dir)
        (.mkdirs cluster-savepoint-dir))
-     (let [save-dir (io/file cluster-savepoint-dir name)
+     (let [save-dir    (io/file cluster-savepoint-dir name)
            cluster-dir (io/file ccm-dir cluster)]
        (flush!)
        (if (copy-files cluster-dir save-dir)
@@ -208,7 +211,7 @@
    (if (ensure-active)
      (restore! (active-cluster) savepoint)))
   ([cluster savepoint]
-   (let [save-dir (io/file savepoint-dir cluster savepoint)
+   (let [save-dir    (io/file savepoint-dir cluster savepoint)
          cluster-dir (io/file ccm-dir cluster)]
      (if (active-cluster) (stop!))
      (if (= (:exit (sync-dir save-dir cluster-dir) 0))
@@ -244,57 +247,40 @@
        (do (log/error "Failed to deleted savepoints for" cluster)
            false)))))
 
-(defn numeric-alpha-keyfn [max-len]
-  (fn [k]
-    (let [k-str (str k)
-          k-len (count k-str)]
-      (vec (for [i (range max-len)]
-             (if (< i k-len)
-               (long (.charAt k-str i))
-               0))))))
-
 (defn auto-cluster!
   "Experimental :
 
-  Will  create new cluster as per new! and start! and the loading of cql files from the classpath resources
-  as per `keyspace->clq-re`, a map of keyspace to regular expressions matching the files to load against
-  that keyspace from those on the classpath. The files will be loaded in numeric-alpha (1-b, 2-a, 11-a, a, b1, b12, b2) order generally but with priority
-  given to files containing the word \"keyspace\" then files containing the word \"schema\".
+  Will create new cluster as per new! and start! and  loading of cql files as per a seq of keyspace-cqls and
+   and a map `keyspace->cqls`, which maps a keyspace to a load ordered list or classpath resources.
+
+  Optionally a regex can be used instead of path in both args, which inline to a futher list of paths matches
+  against all classpath relative resources (this is slower). Those inlined files will be sorted in numeric-alpha order
+  (1-b, 2-a, 11-a, a, b1, b12, b2).
 
   For example:
-   {\"testkeyspace\": #\"schema/.*.cql\"}  would match the contents of the path ./schema
-    my-keyspace.cql, 1_schema.cql, 1_data.cql, 2_data.cql
-    and they would be loaded in that order.
+   {\"testkeyspace\":  [\"my-keyspace.cql\". \"my-schema.cql\", #\".*data.cql\"} would first load
+    my-keyspace.cql, then my_schema.cql, followed by 1_data.cql, 2_data.cql etc"
 
-    {\"testkeyspace\": [#\"keyspace/.*.cql\", #\"schema/.*.cql\", #\"data/.*.cql\"]} would have the same effect."
-
-  ([name version num-nodes keyspace->cql-re]
-   (auto-cluster! name version num-nodes keyspace->cql-re {}))
-  ([name version num-nodes keyspace->cql-re opts]
+  ([name version num-nodes keyspace-cqls keyspace->cqls]
+   (auto-cluster! name version num-nodes keyspace-cqls keyspace->cqls {}))
+  ([name version num-nodes keyspace-cqls keyspace->cqls opts]
    (try
      (if (cluster? name) (remove! name))
      (new! name version num-nodes opts)
-     (doseq [keyspace (keys keyspace->cql-re)
-             :let [cql-res (keyspace->cql-re keyspace)]]
-       (let [urls (classpath-resources cql-res)
-             max-len (apply max (map #(count (str %)) urls))
-             urls (sort-by (numeric-alpha-keyfn max-len) urls)
-             {:keys [keyspace-urls schema-urls data-urls]} (if (seq urls)
-                                                             (group-by (fn [u]
-                                                                         (let [rn (str/lower-case (str u))]
-                                                                           (cond
-                                                                             (.contains rn "keyspace") :keyspace-urls
-                                                                             (.contains rn "schema") :schema-urls
-                                                                             :else :data-urls))) urls))]
-         (if (and keyspace-urls (empty? keyspace-urls) (empty? schema-urls) (empty? data-urls))
-           (log/warn "No sources for keyspace" keyspace "found on classpath"))
-         (doseq [cql keyspace-urls]
-           (cql! cql))
-         (doseq [cql schema-urls]
-           (cql! cql keyspace))
-         (doseq [cql data-urls]
-           (cql! cql keyspace))))
-      (switch! name)
+     (let [resources (classpath-resources)
+           expanded-keyspace-cqls (expand-cqls resources keyspace-cqls)]
+       (if (seq expanded-keyspace-cqls)
+         (log/info "Loading keyspace cqls" expanded-keyspace-cqls)
+         (log/warn "No keyspace cqls found from" keyspace-cqls))
+       (doseq [keyspace-cql expanded-keyspace-cqls]
+         (cql! keyspace-cql))
+       (doseq [keyspace (keys keyspace->cqls)
+               :let [cqls (expand-cqls resources (keyspace->cqls keyspace))]]
+         (log/info "Found" cqls)
+         (if (seq cqls)
+           (doseq [cql cqls]
+             (cql! cql keyspace))
+           (log/warn "No sources for keyspace" keyspace "found on classpath"))))
      (catch Throwable t (do (log/error "Error starting cluster" name)
                             (if (active-cluster) (stop!))
                             (throw t))))))

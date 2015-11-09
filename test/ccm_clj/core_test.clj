@@ -2,7 +2,8 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [expectations :refer :all]
-            [ccm-clj.core :refer :all]))
+            [ccm-clj.core :refer :all]
+            [ccm-clj.impl :as impl]))
 
 (set! *warn-on-reflection* true)
 
@@ -12,12 +13,16 @@
 (def current-keyspace (default-keyspace current-cluster))
 
 (defn tidy-up-pre {:expectations-options :before-run} []
-  (if current-cluster (stop!)))
+  (if current-cluster (stop!))
+  (if (cluster? "ccmcljtest1") (remove! "ccmcljtest1"))
+  (if (cluster? "ccmcljtest2") (remove! "ccmcljtest2"))
+  (if (cluster? "ccmcljauto") (remove! "ccmcljauto")))
 
 (defn tidy-up-post {:expectations-options :after-run} []
   (if current-cluster (stop!))
   (if (cluster? "ccmcljtest1") (remove! "ccmcljtest1"))
   (if (cluster? "ccmcljtest2") (remove! "ccmcljtest2"))
+  (if (cluster? "ccmcljauto") (remove! "ccmcljauto"))
   (if current-keyspace (set-default-keyspace! current-keyspace))
   (remove-savepoints! "ccmcljtest1")
   (remove-savepoints! "ccmcljtest2")
@@ -42,7 +47,7 @@
 
 ;test reader
 (expect (str/trim (slurp (io/file "./test/resources/test-data2.table")))
-        (str/trim (:out (cql! (io/reader "./test/resources/test-data2.query")))))
+  (str/trim (:out (cql! (io/reader "./test/resources/test-data2.query")))))
 
 (expect (set ["node1" "node2" "node3"]) (set (:nodes (cluster-conf))))
 
@@ -62,8 +67,8 @@
 (expect (start! "ccmcljtest1"))
 
 (expect (hash-set "node1" "node2" "node3" "node4")
-        (do (add-node! "node4" "127.0.0.4" 20115)
-            (set (:nodes (cluster-conf)))))
+  (do (add-node! "node4" "127.0.0.4" 20115)
+      (set (:nodes (cluster-conf)))))
 
 (expect (flush! "node4"))
 
@@ -89,8 +94,9 @@
 (stop!)
 ;check load order
 (expect ["11" "112" "1A" "1_2" "2" "21a" "21ba" "222aa" "5" "A21" "Aa"]
-        (sort-by (numeric-alpha-keyfn 5) ["Aa" "222aa" "21a" "21ba" "11" "1_2" "A21" "1A" "112" "5" "2"]))
+  (sort-by (impl/numeric-alpha-keyfn 5) ["Aa" "222aa" "21a" "21ba" "11" "1_2" "A21" "1A" "112" "5" "2"]))
 
 (expect "ccmcljauto"
-        (do (auto-cluster! "ccmcljauto" "2.1.9" 3 {"ccmclj" [#"test-.*\.cql"]})
-            (active-cluster)))
+  (do (auto-cluster! "ccmcljauto" "2.1.9" 3 [#"auto.*/auto-keyspace.cql"]
+        {"ccmclj" [#"autoschema/.*schema.*cql" "autoschema/test-data.cql"]})
+      (active-cluster)))
