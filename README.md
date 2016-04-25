@@ -1,5 +1,7 @@
 # CCM-clj
 
+[![Join the chat at https://gitter.im/SMX-LTD/ccm-clj](https://badges.gitter.im/SMX-LTD/ccm-clj.svg)](https://gitter.im/SMX-LTD/ccm-clj?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 A Clojure (1.6+) interface to Cassandra Cluster Manager (https://github.com/pcmanus/ccm) suitable for use in integration tests and creating arbitrary Cassandra Clusters.
 CCM-clj is courtesy of SMX (http://smxemail.com) where we have been using it for a couple of years to simplify development with Cassandra and Clojure.
 As a JVM library, it is however easily used with other languages [http://clojure.github.io/clojure/javadoc/].
